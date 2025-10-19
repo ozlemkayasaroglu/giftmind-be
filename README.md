@@ -38,9 +38,11 @@ Backend API for the GiftMind application built with Node.js and Express.
    - Set your MongoDB Atlas connection string
    - Adjust the port if needed
    
+   **⚠️ SECURITY WARNING:** Never commit your `.env` file or expose your actual database credentials in any public repository!
+   
    **Example MongoDB Atlas URI format:**
    ```
-   MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/?retryWrites=true&w=majority&appName=your-app-name
+   MONGODB_URI=mongodb+srv://YOUR_USERNAME:YOUR_PASSWORD@YOUR_CLUSTER.mongodb.net/?retryWrites=true&w=majority&appName=your-app-name
    ```
 
 ## Running the Server

@@ -1,30 +1,49 @@
+require('dotenv').config();
+
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
-require('dotenv').config();
+const supabase = require('./config/supabaseClient');
+
+// Import routes
+const authRoutes = require('./routes/auth');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// MongoDB connection
-mongoose.connect(process.env.MONGODB_URI)
-  .then(() => {
-    console.log('✅ Connected to MongoDB Atlas');
-  })
-  .catch((error) => {
-    console.error('❌ MongoDB connection error:', error);
-    process.exit(1);
-  });
+// MongoDB connection (optional - using Supabase as primary DB)
+if (process.env.MONGODB_URI) {
+  mongoose.connect(process.env.MONGODB_URI)
+    .then(() => {
+      console.log('✅ Connected to MongoDB Atlas');
+    })
+    .catch((error) => {
+      console.error('❌ MongoDB connection error:', error);
+    });
+} else {
+  console.log('📋 MongoDB URI not provided - using Supabase as primary database');
+}
 
 // Middleware
 app.use(cors()); // Enable CORS for all routes
 app.use(express.json()); // Parse JSON bodies
 
+// Routes
+app.use('/api', authRoutes);
+
 // Basic route for testing
 app.get('/', (req, res) => {
   res.json({ 
     message: 'Welcome to GiftMind Backend API',
-    status: 'Server is running successfully'
+    status: 'Server is running successfully',
+    endpoints: {
+      health: '/health',
+      supabaseTest: '/supabase-test',
+      register: 'POST /api/register',
+      login: 'POST /api/login',
+      logout: 'POST /api/logout',
+      user: 'GET /api/user'
+    }
   });
 });
 
@@ -34,9 +53,32 @@ app.get('/health', (req, res) => {
   res.json({ 
     status: 'OK',
     database: dbStatus,
+    supabase: 'Connected',
     timestamp: new Date().toISOString(),
     port: PORT
   });
+});
+
+// Supabase test endpoint
+app.get('/supabase-test', async (req, res) => {
+  try {
+    // Test Supabase connection by checking the URL
+    const { data, error } = await supabase.from('test').select('*').limit(1);
+    
+    res.json({
+      message: 'Supabase client is working',
+      status: 'success',
+      supabaseUrl: process.env.SUPABASE_URL,
+      hasError: !!error,
+      error: error?.message || null
+    });
+  } catch (err) {
+    res.status(500).json({
+      message: 'Supabase connection error',
+      status: 'error',
+      error: err.message
+    });
+  }
 });
 
 // Start server

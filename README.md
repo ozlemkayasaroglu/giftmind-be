@@ -4,17 +4,21 @@ Backend API for the GiftMind application built with Node.js and Express.
 
 ## Features
 
-- Express.js server
-- CORS enabled
-- JSON body parsing
-- MongoDB integration with Mongoose
+- Express.js server with CORS enabled
+- Supabase integration for authentication and database
+- MongoDB Atlas support (optional)
+- AI-powered gift recommendations using Hugging Face
+- Persona management with CRUD operations
+- JWT authentication with Row Level Security (RLS)
 - Environment variable configuration
-- Basic health check endpoint
+- Comprehensive error handling
 
 ## Prerequisites
 
 - Node.js (v14 or higher)
-- MongoDB Atlas account (or local MongoDB installation)
+- Supabase account for database and authentication
+- Hugging Face account for AI recommendations (optional, fallback available)
+- MongoDB Atlas account (optional, for additional data storage)
 
 ## Installation
 
@@ -35,15 +39,12 @@ Backend API for the GiftMind application built with Node.js and Express.
    ```
 
 4. Update the `.env` file with your configuration:
-   - Set your MongoDB Atlas connection string
+   - Set your Supabase project URL and anon key
+   - Add your Hugging Face token for AI recommendations (optional)
+   - Set your MongoDB Atlas connection string (optional)
    - Adjust the port if needed
    
-   **⚠️ SECURITY WARNING:** Never commit your `.env` file or expose your actual database credentials in any public repository!
-   
-   **Example MongoDB Atlas URI format:**
-   ```
-   MONGODB_URI=mongodb+srv://YOUR_USERNAME:YOUR_PASSWORD@YOUR_CLUSTER.mongodb.net/?retryWrites=true&w=majority&appName=your-app-name
-   ```
+   **⚠️ SECURITY WARNING:** Never commit your `.env` file or expose your actual credentials in any public repository!
 
 ## Running the Server
 
@@ -61,28 +62,87 @@ The server will start on `http://localhost:5000` (or your configured PORT).
 
 ## API Endpoints
 
+### General
 - `GET /` - Welcome message
-- `GET /health` - Health check endpoint (includes database connection status)
+- `GET /health` - Health check endpoint
+
+### Authentication
+- `POST /api/auth/register` - Register new user
+- `POST /api/auth/login` - User login
+- `POST /api/auth/logout` - User logout
+- `GET /api/auth/user` - Get current user profile
+
+### Personas Management
+- `GET /api/personas` - Get user's personas
+- `POST /api/personas` - Create new persona
+- `GET /api/personas/:id` - Get specific persona
+- `PUT /api/personas/:id` - Update persona
+- `DELETE /api/personas/:id` - Delete persona
+
+### Gift Recommendations (AI-Powered)
+- `POST /api/gift/recommend` - Get personalized gift recommendations for a persona
+- `POST /api/gift/batch-recommend` - Get recommendations for multiple personas
+- `GET /api/gift/categories` - Get available gift categories
+- `GET /api/gift/stats` - Get user's recommendation statistics
 
 ## Environment Variables
 
 - `PORT` - Server port (default: 5000)
-- `MONGODB_URI` - MongoDB Atlas connection string
+- `SUPABASE_URL` - Supabase project URL
+- `SUPABASE_ANON_KEY` - Supabase anonymous key
+- `HUGGING_FACE_TOKEN` - Hugging Face API token (optional, fallback available)
+- `MONGODB_URI` - MongoDB Atlas connection string (optional)
 - `NODE_ENV` - Environment (development/production)
+
+## Hugging Face Integration
+
+The application uses Hugging Face's AI models to generate personalized gift recommendations. 
+
+### Setup
+1. Create a free account at [Hugging Face](https://huggingface.co)
+2. Go to Settings → Access Tokens
+3. Create a new token with read permissions
+4. Add the token to your `.env` file as `HUGGING_FACE_TOKEN`
+
+### Fallback
+If no Hugging Face token is provided, the system automatically falls back to a comprehensive mock recommendation engine with:
+- Interest-based matching
+- Age-appropriate suggestions
+- Contextual reasoning
+- Multiple gift categories
 
 ## Project Structure
 
 ```
 giftmind-be/
-├── models/           # MongoDB schemas and models
-│   └── User.js       # User model example
-├── index.js          # Main server file
-├── package.json      # Dependencies and scripts
-├── .env              # Environment variables (not in repo)
-├── .env.example      # Environment variables template
-├── .gitignore        # Git ignore rules
-└── README.md         # Project documentation
+├── config/
+│   └── supabaseClient.js    # Supabase configuration
+├── routes/
+│   ├── auth.js              # Authentication endpoints
+│   ├── personas.js          # Persona CRUD operations
+│   ├── persona.js           # Additional persona endpoints
+│   └── gift.js              # AI gift recommendation endpoints
+├── services/
+│   └── aiGiftRecommender.js # Hugging Face AI integration
+├── sql/
+│   └── create_personas_table.sql # Database schema
+├── index.js                 # Main server file
+├── package.json             # Dependencies and scripts
+├── .env                     # Environment variables (not in repo)
+├── .env.example             # Environment variables template
+├── .gitignore               # Git ignore rules
+└── README.md                # Project documentation
 ```
+
+## Database Setup
+
+### Supabase Setup
+1. Create a new Supabase project
+2. Run the SQL script in `sql/create_personas_table.sql` in the SQL Editor
+3. This will create the personas table with proper RLS policies
+
+### Authentication
+The application uses Supabase Auth with JWT tokens. Users can register, login, and access protected endpoints using Bearer tokens.
 
 ## Contributing
 

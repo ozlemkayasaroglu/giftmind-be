@@ -1,9 +1,14 @@
 /**
  * AI Gift Recommender Service
- * Generates personalized gift ideas based on persona information
+ * Generates personalized gift ideas based on persona information using Hugging Face AI
  */
 
-// Mock gift database categorized by interests
+const { HfInference } = require('@huggingface/inference');
+
+// Initialize Hugging Face client
+const hf = new HfInference(process.env.HUGGING_FACE_TOKEN);
+
+// Backup gift database for fallback scenarios
 const giftDatabase = {
   // Reading and books
   'kitap': ['Bestseller kitap seti', 'E-kitap okuyucu', 'Kitap ayracı koleksiyonu'],
@@ -158,61 +163,193 @@ function getGiftsFromNotes(notes) {
 }
 
 /**
- * Generate personalized gift recommendations
+ * Create a detailed prompt for the AI model
  */
-function generateGiftIdeas(persona) {
+function createGiftPrompt(persona) {
+  const { name, interests, birth_date, notes } = persona;
+  const age = calculateAge(birth_date);
+  const ageCategory = getAgeCategory(age);
+  
+  let prompt = `Generate 3 personalized gift recommendations for ${name}.\n\n`;
+  
+  // Add age information
+  if (age) {
+    prompt += `Age: ${age} years old (${ageCategory})\n`;
+  }
+  
+  // Add interests
+  if (interests && interests.length > 0) {
+    prompt += `Interests: ${interests.join(', ')}\n`;
+  }
+  
+  // Add notes
+  if (notes && notes.length > 0) {
+    prompt += `Additional notes: ${notes.join(', ')}\n`;
+  }
+  
+  prompt += `\nPlease provide 3 specific, thoughtful gift ideas with brief explanations. Format each recommendation as:
+1. [Gift Name] - [Brief reason why this gift suits them]
+2. [Gift Name] - [Brief reason why this gift suits them]
+3. [Gift Name] - [Brief reason why this gift suits them]
+
+Focus on practical, meaningful gifts that align with their interests and personality.`;
+  
+  return prompt;
+}
+
+/**
+ * Parse AI response into structured format
+ */
+function parseAIResponse(response, persona) {
+  const lines = response.split('\n').filter(line => line.trim());
+  const recommendations = [];
+  
+  for (let i = 0; i < lines.length && recommendations.length < 3; i++) {
+    const line = lines[i].trim();
+    
+    // Look for numbered lists (1., 2., 3.) or bullet points
+    const match = line.match(/^[\d\-\*•]\s*\.?\s*(.+?)(?:\s*-\s*(.+))?$/);
+    
+    if (match) {
+      const [, giftPart, reasonPart] = match;
+      
+      // Split gift and reason if they're in the same line
+      let title = giftPart.trim();
+      let reason = reasonPart ? reasonPart.trim() : '';
+      
+      // If no reason provided, generate a default one
+      if (!reason) {
+        reason = `Özel olarak ${persona.name} için seçilmiş hediye`;
+      }
+      
+      recommendations.push({
+        id: recommendations.length + 1,
+        title: title,
+        reason: reason,
+        confidence: Math.floor(Math.random() * 20) + 80 // 80-100% confidence for AI recommendations
+      });
+    }
+  }
+  
+  return recommendations;
+}
+
+/**
+ * Fallback function using the original mock logic
+ */
+function generateFallbackGifts(persona) {
+  const { name, interests, birth_date, notes } = persona;
+  
+  let giftIdeas = [];
+  
+  // Get gifts based on interests
+  const interestGifts = getGiftsFromInterests(interests);
+  giftIdeas.push(...interestGifts);
+  
+  // Get gifts based on notes
+  const noteGifts = getGiftsFromNotes(notes);
+  giftIdeas.push(...noteGifts);
+  
+  // Add age-appropriate gifts
+  const age = calculateAge(birth_date);
+  const ageCategory = getAgeCategory(age);
+  const ageGifts = ageBasedGifts[ageCategory] || ageBasedGifts.adult;
+  giftIdeas.push(...ageGifts);
+  
+  // Remove duplicates and shuffle
+  giftIdeas = [...new Set(giftIdeas)];
+  
+  if (giftIdeas.length < 3) {
+    const remainingCount = 3 - giftIdeas.length;
+    const shuffledGeneric = [...genericGifts].sort(() => Math.random() - 0.5);
+    giftIdeas.push(...shuffledGeneric.slice(0, remainingCount));
+  }
+  
+  const shuffledGifts = giftIdeas.sort(() => Math.random() - 0.5);
+  const selectedGifts = shuffledGifts.slice(0, 3);
+  
+  return selectedGifts.map((gift, index) => ({
+    id: index + 1,
+    title: gift,
+    reason: generateReason(gift, persona),
+    confidence: Math.floor(Math.random() * 30) + 70 // 70-100% confidence
+  }));
+}
+
+/**
+ * Generate personalized gift recommendations using Hugging Face AI
+ */
+async function generateGiftIdeas(persona) {
   try {
-    const { name, interests, birth_date, notes } = persona;
+    const { name } = persona;
     
     // Validate input
     if (!name) {
       throw new Error('Persona name is required');
     }
     
-    let giftIdeas = [];
-    
-    // 1. Get gifts based on interests
-    const interestGifts = getGiftsFromInterests(interests);
-    giftIdeas.push(...interestGifts);
-    
-    // 2. Get gifts based on notes
-    const noteGifts = getGiftsFromNotes(notes);
-    giftIdeas.push(...noteGifts);
-    
-    // 3. Add age-appropriate gifts
-    const age = calculateAge(birth_date);
+    const age = calculateAge(persona.birth_date);
     const ageCategory = getAgeCategory(age);
-    const ageGifts = ageBasedGifts[ageCategory] || ageBasedGifts.adult;
-    giftIdeas.push(...ageGifts);
     
-    // 4. Remove duplicates
-    giftIdeas = [...new Set(giftIdeas)];
+    let recommendations = [];
     
-    // 5. If we don't have enough gifts, add generic ones
-    if (giftIdeas.length < 3) {
-      const remainingCount = 3 - giftIdeas.length;
-      const shuffledGeneric = [...genericGifts].sort(() => Math.random() - 0.5);
-      giftIdeas.push(...shuffledGeneric.slice(0, remainingCount));
+    // Check if Hugging Face token is available
+    if (!process.env.HUGGING_FACE_TOKEN) {
+      console.warn('Hugging Face token not found, using fallback recommendations');
+      recommendations = generateFallbackGifts(persona);
+    } else {
+      try {
+        // Create prompt for AI
+        const prompt = createGiftPrompt(persona);
+        
+        console.log('Generating AI recommendations for:', name);
+        
+        // Call Hugging Face API for text generation
+        const response = await hf.textGeneration({
+          model: 'microsoft/DialoGPT-medium',
+          inputs: prompt,
+          parameters: {
+            max_new_tokens: 300,
+            temperature: 0.7,
+            do_sample: true,
+            return_full_text: false
+          }
+        });
+        
+        // Parse the AI response
+        if (response && response.generated_text) {
+          recommendations = parseAIResponse(response.generated_text, persona);
+        }
+        
+        // If AI didn't provide enough recommendations, use fallback
+        if (recommendations.length === 0) {
+          console.log('AI response insufficient, using fallback for:', name);
+          recommendations = generateFallbackGifts(persona);
+        }
+        
+      } catch (aiError) {
+        console.error('Hugging Face API error:', aiError.message);
+        console.log('Falling back to mock recommendations for:', name);
+        recommendations = generateFallbackGifts(persona);
+      }
     }
     
-    // 6. Shuffle and select top 3
-    const shuffledGifts = giftIdeas.sort(() => Math.random() - 0.5);
-    const selectedGifts = shuffledGifts.slice(0, 3);
+    // Ensure we always have 3 recommendations
+    while (recommendations.length < 3) {
+      const fallbackGifts = generateFallbackGifts(persona);
+      recommendations.push(...fallbackGifts.slice(0, 3 - recommendations.length));
+    }
     
-    // 7. Format response
+    // Format final response
     return {
       success: true,
       personaName: name,
       age: age,
       ageCategory: ageCategory,
-      recommendations: selectedGifts.map((gift, index) => ({
-        id: index + 1,
-        title: gift,
-        reason: generateReason(gift, persona),
-        confidence: Math.floor(Math.random() * 30) + 70 // 70-100% confidence
-      })),
+      recommendations: recommendations.slice(0, 3), // Ensure exactly 3 recommendations
       generatedAt: new Date().toISOString(),
-      totalOptions: giftIdeas.length
+      aiGenerated: process.env.HUGGING_FACE_TOKEN ? true : false,
+      totalOptions: recommendations.length
     };
     
   } catch (error) {

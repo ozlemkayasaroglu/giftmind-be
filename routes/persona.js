@@ -1,5 +1,6 @@
 const express = require('express');
 const supabase = require('../config/supabaseClient');
+const { generateGiftIdeas, getGiftCategories } = require('../services/aiGiftRecommender');
 const router = express.Router();
 
 // Middleware to verify authentication and extract user
@@ -282,6 +283,91 @@ router.delete('/:id', verifyAuth, async (req, res) => {
 
   } catch (error) {
     console.error('Delete persona error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error'
+    });
+  }
+});
+
+// POST /api/persona/:id/gift-ideas - Generate gift ideas for specific persona
+router.post('/:id/gift-ideas', verifyAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Validate UUID format
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(id)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid persona ID format'
+      });
+    }
+
+    // Get persona from database
+    const { data: persona, error } = await supabase
+      .from('personas')
+      .select('*')
+      .eq('id', id)
+      .eq('user_id', req.user.id)
+      .single();
+
+    if (error || !persona) {
+      return res.status(404).json({
+        success: false,
+        message: 'Persona not found'
+      });
+    }
+
+    // Generate gift ideas using AI service
+    const giftRecommendations = generateGiftIdeas(persona);
+
+    if (!giftRecommendations.success) {
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to generate gift ideas',
+        error: giftRecommendations.error
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Gift ideas generated successfully',
+      persona: {
+        id: persona.id,
+        name: persona.name,
+        age: giftRecommendations.age,
+        ageCategory: giftRecommendations.ageCategory
+      },
+      giftIdeas: giftRecommendations.recommendations,
+      metadata: {
+        totalOptions: giftRecommendations.totalOptions,
+        generatedAt: giftRecommendations.generatedAt
+      }
+    });
+
+  } catch (error) {
+    console.error('Generate gift ideas error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error'
+    });
+  }
+});
+
+// GET /api/persona/gift-categories - Get available gift categories
+router.get('/gift-categories', (req, res) => {
+  try {
+    const categories = getGiftCategories();
+    
+    res.status(200).json({
+      success: true,
+      categories: categories,
+      total: categories.length
+    });
+
+  } catch (error) {
+    console.error('Get gift categories error:', error);
     res.status(500).json({
       success: false,
       message: 'Internal server error'

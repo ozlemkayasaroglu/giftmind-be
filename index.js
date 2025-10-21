@@ -9,6 +9,7 @@ const supabase = require('./config/supabaseClient');
 const authRoutes = require('./routes/auth');
 const personasRoutes = require('./routes/personas');
 const personaRoutes = require('./routes/persona');
+const giftRoutes = require('./routes/gift');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -34,6 +35,7 @@ app.use(express.json()); // Parse JSON bodies
 app.use('/api', authRoutes);
 app.use('/api/personas', personasRoutes);
 app.use('/api/persona', personaRoutes);
+app.use('/api/gift', giftRoutes);
 
 // Basic route for testing
 app.get('/', (req, res) => {
@@ -59,7 +61,15 @@ app.get('/', (req, res) => {
         create: 'POST /api/persona',
         get: 'GET /api/persona/:id',
         update: 'PUT /api/persona/:id',
-        delete: 'DELETE /api/persona/:id'
+        delete: 'DELETE /api/persona/:id',
+        giftIdeas: 'POST /api/persona/:id/gift-ideas',
+        giftCategories: 'GET /api/persona/gift-categories'
+      },
+      gift: {
+        recommend: 'POST /api/gift/recommend',
+        batchRecommend: 'POST /api/gift/batch-recommend',
+        categories: 'GET /api/gift/categories',
+        stats: 'GET /api/gift/stats'
       }
     }
   });

@@ -8,6 +8,7 @@ const supabase = require('./config/supabaseClient');
 // Import routes
 const authRoutes = require('./routes/auth');
 const personasRoutes = require('./routes/personas');
+const personaRoutes = require('./routes/persona');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -32,6 +33,7 @@ app.use(express.json()); // Parse JSON bodies
 // Routes
 app.use('/api', authRoutes);
 app.use('/api/personas', personasRoutes);
+app.use('/api/persona', personaRoutes);
 
 // Basic route for testing
 app.get('/', (req, res) => {
@@ -51,6 +53,13 @@ app.get('/', (req, res) => {
         get: 'GET /api/personas/:id',
         update: 'PUT /api/personas/:id',
         delete: 'DELETE /api/personas/:id'
+      },
+      persona: {
+        list: 'GET /api/persona',
+        create: 'POST /api/persona',
+        get: 'GET /api/persona/:id',
+        update: 'PUT /api/persona/:id',
+        delete: 'DELETE /api/persona/:id'
       }
     }
   });

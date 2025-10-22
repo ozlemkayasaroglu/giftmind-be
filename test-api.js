@@ -141,10 +141,10 @@ async function testCreatePersona() {
   const headers = { Authorization: `Bearer ${authToken}` };
   const result = await apiCall('POST', '/api/personas', testPersona, headers);
   
-  if (result.success && result.data.data?.id) {
+  if (result.success && result.data.persona?.id) {
     console.log('✅ Create persona passed');
-    console.log('   Persona ID:', result.data.data.id);
-    personaId = result.data.data.id;
+    console.log('   Persona ID:', result.data.persona.id);
+    personaId = result.data.persona.id;
     return true;
   } else {
     console.log('❌ Create persona failed:', result.error);
@@ -159,7 +159,7 @@ async function testGetPersonas() {
   
   if (result.success) {
     console.log('✅ Get personas passed');
-    console.log('   Personas count:', result.data.data?.length || 0);
+    console.log('   Personas count:', result.data.personas?.length || 0);
   } else {
     console.log('❌ Get personas failed:', result.error);
   }
@@ -178,7 +178,7 @@ async function testGetSinglePersona() {
   
   if (result.success) {
     console.log('✅ Get single persona passed');
-    console.log('   Persona name:', result.data.data?.name);
+    console.log('   Persona name:', result.data.persona?.name);
   } else {
     console.log('❌ Get single persona failed:', result.error);
   }

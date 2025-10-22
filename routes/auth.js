@@ -125,6 +125,7 @@ router.post('/login', async (req, res) => {
     res.status(200).json({
       success: true,
       message: 'Login successful',
+      token: data.session.access_token,  // Add token field for compatibility
       user: {
         id: data.user.id,
         email: data.user.email,

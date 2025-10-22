@@ -84,7 +84,7 @@ router.post('/recommend', verifyAuth, async (req, res) => {
     }
 
     // Generate gift ideas using AI service
-    const giftRecommendations = generateGiftIdeas(persona);
+    const giftRecommendations = await generateGiftIdeas(persona);
 
     if (!giftRecommendations.success) {
       console.error('Gift generation error:', giftRecommendations.error);
@@ -184,7 +184,7 @@ router.post('/batch-recommend', verifyAuth, async (req, res) => {
 
     for (const persona of personas) {
       try {
-        const giftRecommendations = generateGiftIdeas(persona);
+        const giftRecommendations = await generateGiftIdeas(persona);
         
         if (giftRecommendations.success) {
           results.push({

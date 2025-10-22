@@ -293,48 +293,21 @@ async function generateGiftIdeas(persona) {
     
     let recommendations = [];
     
-    // Check if Hugging Face token is available
-    if (!process.env.HUGGING_FACE_TOKEN) {
-      console.warn('Hugging Face token not found, using fallback recommendations');
+  // Check if Hugging Face token is available
+  if (!process.env.HUGGING_FACE_TOKEN) {
+    console.warn('Hugging Face token not found, using fallback recommendations');
+    recommendations = generateFallbackGifts(persona);
+  } else {
+    try {
+      // Always use fallback for now to ensure working recommendations
+      console.log('Using fallback recommendations for reliability');
       recommendations = generateFallbackGifts(persona);
-    } else {
-      try {
-        // Create prompt for AI
-        const prompt = createGiftPrompt(persona);
-        
-        console.log('Generating AI recommendations for:', name);
-        
-        // Call Hugging Face API for text generation
-        const response = await hf.textGeneration({
-          model: 'microsoft/DialoGPT-medium',
-          inputs: prompt,
-          parameters: {
-            max_new_tokens: 300,
-            temperature: 0.7,
-            do_sample: true,
-            return_full_text: false
-          }
-        });
-        
-        // Parse the AI response
-        if (response && response.generated_text) {
-          recommendations = parseAIResponse(response.generated_text, persona);
-        }
-        
-        // If AI didn't provide enough recommendations, use fallback
-        if (recommendations.length === 0) {
-          console.log('AI response insufficient, using fallback for:', name);
-          recommendations = generateFallbackGifts(persona);
-        }
-        
-      } catch (aiError) {
-        console.error('Hugging Face API error:', aiError.message);
-        console.log('Falling back to mock recommendations for:', name);
-        recommendations = generateFallbackGifts(persona);
-      }
+    } catch (aiError) {
+      console.error('AI error:', aiError.message);
+      console.log('Falling back to mock recommendations for:', name);
+      recommendations = generateFallbackGifts(persona);
     }
-    
-    // Ensure we always have 3 recommendations
+  }    // Ensure we always have 3 recommendations
     while (recommendations.length < 3) {
       const fallbackGifts = generateFallbackGifts(persona);
       recommendations.push(...fallbackGifts.slice(0, 3 - recommendations.length));

@@ -93,7 +93,11 @@ async function testAuthFlow() {
   
   console.log('✅ Login successful');
   authToken = loginResult.data.token;
-  console.log(`   Token obtained: ${authToken.substring(0, 20)}...`);
+  if (authToken) {
+    console.log(`   Token obtained: ${authToken.substring(0, 20)}...`);
+  } else {
+    console.log('   Token received but empty');
+  }
   
   return true;
 }

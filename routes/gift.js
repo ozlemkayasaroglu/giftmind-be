@@ -95,7 +95,14 @@ router.post('/recommend', verifyAuth, async (req, res) => {
       });
     }
 
-    // Return successful response
+    // Flatten to string suggestions for simple UIs
+    const suggestionTitles = (giftRecommendations.recommendations || []).map((r) => {
+      if (!r) return '';
+      if (typeof r === 'string') return r;
+      return r.title || r.name || '';
+    }).filter(Boolean);
+
+    // Return successful response (keep detailed + simple forms)
     res.status(200).json({
       success: true,
       message: 'Gift recommendations generated successfully',
@@ -105,7 +112,11 @@ router.post('/recommend', verifyAuth, async (req, res) => {
         age: giftRecommendations.age,
         ageCategory: giftRecommendations.ageCategory
       },
+      // Detailed list with objects
       recommendations: giftRecommendations.recommendations,
+      // Simple lists for frontend convenience
+      data: suggestionTitles,
+      suggestions: suggestionTitles,
       metadata: {
         totalOptions: giftRecommendations.totalOptions,
         generatedAt: giftRecommendations.generatedAt,

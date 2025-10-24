@@ -225,4 +225,49 @@ router.get('/user', async (req, res) => {
   }
 });
 
+// POST /api/password/forgot - Request password reset (generic response to avoid user enumeration)
+router.post('/password/forgot', async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email is required'
+      });
+    }
+
+    // Try to trigger Supabase password reset email if available, but do not expose details to the client
+    try {
+      // v2 client: supabase.auth.resetPasswordForEmail
+      if (typeof supabase.auth?.resetPasswordForEmail === 'function') {
+        await supabase.auth.resetPasswordForEmail(email, {
+          // optional redirect after password reset (configure via env if needed)
+          redirectTo: process.env.PASSWORD_RESET_REDIRECT || undefined
+        });
+      } else if (typeof supabase.auth?.api?.resetPasswordForEmail === 'function') {
+        // older client variation
+        await supabase.auth.api.resetPasswordForEmail(email);
+      } else {
+        console.warn('Supabase resetPasswordForEmail not available on auth client.');
+      }
+    } catch (providerError) {
+      // Log provider errors server-side but do not return error details to client
+      console.error('Password reset provider error:', providerError);
+    }
+
+    // Always return a generic success message to avoid revealing whether the email is registered
+    return res.status(200).json({
+      success: true,
+      message: 'If an account with that email exists, password reset instructions have been sent.'
+    });
+  } catch (error) {
+    console.error('Forgot password error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Internal server error'
+    });
+  }
+});
+
 module.exports = router;

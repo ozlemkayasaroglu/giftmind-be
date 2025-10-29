@@ -1,6 +1,8 @@
 const express = require('express');
 const supabase = require('../config/supabaseClient');
 const { generateGiftIdeas, getGiftCategories } = require('../services/aiGiftRecommender');
+const { parseBudgetFromBody, applyBudgetToData, normalizeBudgetFields } = require('../utils/personaBudget');
+const { createClient } = require('@supabase/supabase-js');
 const router = express.Router();
 
 // Middleware to verify authentication and extract user
@@ -27,6 +29,12 @@ const verifyAuth = async (req, res, next) => {
       });
     }
 
+    // Bind a per-request Supabase client with the caller's JWT for RLS
+    req.supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY, {
+      auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+      global: { headers: { Authorization: `Bearer ${token}` } }
+    });
+
     req.user = user;
     next();
   } catch (error) {
@@ -52,7 +60,7 @@ router.post('/', verifyAuth, async (req, res) => {
     }
 
     // Prepare persona data
-    const personaData = {
+    let personaData = {
       user_id: req.user.id,
       name,
       birth_date: birth_date || null,
@@ -60,7 +68,10 @@ router.post('/', verifyAuth, async (req, res) => {
       notes: notes || []
     };
 
-    const { data, error } = await supabase
+    const { min, max } = parseBudgetFromBody(req.body);
+    personaData = await applyBudgetToData(personaData, min, max);
+
+    const { data, error } = await req.supabase
       .from('personas')
       .insert([personaData])
       .select()
@@ -77,7 +88,7 @@ router.post('/', verifyAuth, async (req, res) => {
     res.status(201).json({
       success: true,
       message: 'Persona created successfully',
-      persona: data
+      persona: normalizeBudgetFields(data)
     });
 
   } catch (error) {
@@ -92,7 +103,7 @@ router.post('/', verifyAuth, async (req, res) => {
 // GET /api/persona - List all personas for the logged-in user
 router.get('/', verifyAuth, async (req, res) => {
   try {
-    const { data, error } = await supabase
+    const { data, error } = await req.supabase
       .from('personas')
       .select('*')
       .eq('user_id', req.user.id)
@@ -108,7 +119,7 @@ router.get('/', verifyAuth, async (req, res) => {
 
     res.status(200).json({
       success: true,
-      personas: data || [],
+      personas: (data || []).map(p => normalizeBudgetFields(p)),
       count: data ? data.length : 0
     });
 
@@ -135,7 +146,7 @@ router.get('/:id', verifyAuth, async (req, res) => {
       });
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await req.supabase
       .from('personas')
       .select('*')
       .eq('id', id)
@@ -152,7 +163,7 @@ router.get('/:id', verifyAuth, async (req, res) => {
 
     res.status(200).json({
       success: true,
-      persona: data
+      persona: normalizeBudgetFields(data)
     });
 
   } catch (error) {
@@ -180,21 +191,16 @@ router.put('/:id', verifyAuth, async (req, res) => {
     }
 
     // Prepare update data (only include provided fields)
-    const updateData = {};
+    let updateData = {};
     if (name !== undefined) updateData.name = name;
     if (birth_date !== undefined) updateData.birth_date = birth_date;
     if (interests !== undefined) updateData.interests = interests;
     if (notes !== undefined) updateData.notes = notes;
 
-    // Check if there's anything to update
-    if (Object.keys(updateData).length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'No valid fields provided for update'
-      });
-    }
+    const { min, max } = parseBudgetFromBody(req.body);
+    updateData = await applyBudgetToData(updateData, min, max);
 
-    const { data, error } = await supabase
+    const { data, error } = await req.supabase
       .from('personas')
       .update(updateData)
       .eq('id', id)
@@ -220,7 +226,7 @@ router.put('/:id', verifyAuth, async (req, res) => {
     res.status(200).json({
       success: true,
       message: 'Persona updated successfully',
-      persona: data
+      persona: normalizeBudgetFields(data)
     });
 
   } catch (error) {
@@ -247,7 +253,7 @@ router.delete('/:id', verifyAuth, async (req, res) => {
     }
 
     // First check if the persona exists and belongs to the user
-    const { data: existingPersona, error: fetchError } = await supabase
+    const { data: existingPersona, error: fetchError } = await req.supabase
       .from('personas')
       .select('id')
       .eq('id', id)
@@ -262,7 +268,7 @@ router.delete('/:id', verifyAuth, async (req, res) => {
     }
 
     // Delete the persona
-    const { error } = await supabase
+    const { error } = await req.supabase
       .from('personas')
       .delete()
       .eq('id', id)
@@ -305,7 +311,7 @@ router.post('/:id/gift-ideas', verifyAuth, async (req, res) => {
     }
 
     // Get persona from database
-    const { data: persona, error } = await supabase
+    const { data: persona, error } = await req.supabase
       .from('personas')
       .select('*')
       .eq('id', id)
@@ -320,7 +326,7 @@ router.post('/:id/gift-ideas', verifyAuth, async (req, res) => {
     }
 
     // Generate gift ideas using AI service
-    const giftRecommendations = generateGiftIdeas(persona);
+    const giftRecommendations = await generateGiftIdeas(persona);
 
     if (!giftRecommendations.success) {
       return res.status(500).json({

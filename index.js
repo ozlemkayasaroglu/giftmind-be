@@ -4,6 +4,7 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const supabase = require('./config/supabaseClient');
+const { createClient } = require('@supabase/supabase-js');
 
 // Import routes
 const authRoutes = require('./routes/auth');
@@ -31,10 +32,34 @@ if (process.env.MONGODB_URI) {
 app.use(cors()); // Enable CORS for all routes
 app.use(express.json()); // Parse JSON bodies
 
+// Shared auth middleware to bind per-request Supabase client (RLS)
+const verifyAuth = async (req, res, next) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ success: false, message: 'No authorization token provided' });
+    }
+    const token = authHeader.split(' ')[1];
+    const { data: { user }, error } = await supabase.auth.getUser(token);
+    if (error || !user) {
+      return res.status(401).json({ success: false, message: 'Invalid or expired token' });
+    }
+    req.supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY, {
+      auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+      global: { headers: { Authorization: `Bearer ${token}` } }
+    });
+    req.user = user;
+    next();
+  } catch (e) {
+    console.error('Auth middleware error:', e);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+};
+
 // Routes
 app.use('/api', authRoutes);
-app.use('/api/personas', personasRoutes);
-app.use('/api/persona', personaRoutes);
+app.use('/api/personas', verifyAuth, personasRoutes);
+app.use('/api/persona', verifyAuth, personaRoutes);
 app.use('/api/gift', giftRoutes);
 
 // Basic route for testing

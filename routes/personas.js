@@ -1,6 +1,15 @@
 const express = require('express');
 const supabase = require('../config/supabaseClient');
 const router = express.Router();
+const { parseBudgetFromBody, applyBudgetToData, normalizeBudgetFields } = require('../utils/personaBudget');
+const { createClient } = require('@supabase/supabase-js');
+
+// Helper to coerce array-like fields
+function toArray(val) {
+  if (Array.isArray(val)) return val.filter(v => v !== undefined && v !== null);
+  if (typeof val === 'string') return val.split(',').map(s => s.trim()).filter(Boolean);
+  return [];
+}
 
 // Middleware to verify authentication
 const verifyAuth = async (req, res, next) => {
@@ -26,6 +35,12 @@ const verifyAuth = async (req, res, next) => {
       });
     }
 
+    // Create a per-request Supabase client bound to the user's JWT so RLS policies evaluate auth.uid()
+    req.supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY, {
+      auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+      global: { headers: { Authorization: `Bearer ${token}` } }
+    });
+
     req.user = user;
     next();
   } catch (error) {
@@ -40,7 +55,7 @@ const verifyAuth = async (req, res, next) => {
 // GET /api/personas - Get all personas for authenticated user
 router.get('/', verifyAuth, async (req, res) => {
   try {
-    const { data, error } = await supabase
+    const { data, error } = await req.supabase
       .from('personas')
       .select('*')
       .eq('user_id', req.user.id)
@@ -54,9 +69,11 @@ router.get('/', verifyAuth, async (req, res) => {
       });
     }
 
+    const personas = (data || []).map(p => normalizeBudgetFields(p));
+
     res.status(200).json({
       success: true,
-      personas: data || []
+      personas
     });
 
   } catch (error) {
@@ -71,7 +88,7 @@ router.get('/', verifyAuth, async (req, res) => {
 // POST /api/personas - Create new persona
 router.post('/', verifyAuth, async (req, res) => {
   try {
-    const { name, birth_date, interests, notes } = req.body;
+    const { name, birth_date, description } = req.body;
 
     // Validate required fields
     if (!name) {
@@ -81,16 +98,25 @@ router.post('/', verifyAuth, async (req, res) => {
       });
     }
 
+    const { min, max } = parseBudgetFromBody(req.body);
+    if (process.env.DEBUG_BUDGET === '1') {
+      console.log('[budget] raw body:', req.body);
+      console.log('[budget] parsed -> min:', min, 'max:', max);
+    }
+
     // Prepare persona data
-    const personaData = {
+    let personaData = {
       user_id: req.user.id,
       name,
       birth_date: birth_date || null,
-      interests: interests || [],
-      notes: notes || []
+      interests: toArray(req.body.interests),
+      notes: toArray(req.body.notes),
+      description: description ?? null
     };
 
-    const { data, error } = await supabase
+    personaData = await applyBudgetToData(personaData, min, max);
+
+    const { data, error } = await req.supabase
       .from('personas')
       .insert([personaData])
       .select()
@@ -107,7 +133,7 @@ router.post('/', verifyAuth, async (req, res) => {
     res.status(201).json({
       success: true,
       message: 'Persona created successfully',
-      persona: data
+      persona: normalizeBudgetFields(data)
     });
 
   } catch (error) {
@@ -124,7 +150,7 @@ router.get('/:id', verifyAuth, async (req, res) => {
   try {
     const { id } = req.params;
 
-    const { data, error } = await supabase
+    const { data, error } = await req.supabase
       .from('personas')
       .select('*')
       .eq('id', id)
@@ -141,7 +167,7 @@ router.get('/:id', verifyAuth, async (req, res) => {
 
     res.status(200).json({
       success: true,
-      persona: data
+      persona: normalizeBudgetFields(data)
     });
 
   } catch (error) {
@@ -157,16 +183,23 @@ router.get('/:id', verifyAuth, async (req, res) => {
 router.put('/:id', verifyAuth, async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, birth_date, interests, notes } = req.body;
+    const { name, birth_date, description } = req.body;
 
     // Prepare update data (only include provided fields)
-    const updateData = {};
+    let updateData = {};
     if (name !== undefined) updateData.name = name;
     if (birth_date !== undefined) updateData.birth_date = birth_date;
-    if (interests !== undefined) updateData.interests = interests;
-    if (notes !== undefined) updateData.notes = notes;
+    if (req.body.interests !== undefined) updateData.interests = toArray(req.body.interests);
+    if (req.body.notes !== undefined) updateData.notes = toArray(req.body.notes);
+    if (description !== undefined) updateData.description = description;
 
-    const { data, error } = await supabase
+    const { min, max } = parseBudgetFromBody(req.body);
+    if (process.env.DEBUG_BUDGET === '1') {
+      console.log('[budget][update]', 'min:', min, 'max:', max);
+    }
+    updateData = await applyBudgetToData(updateData, min, max);
+
+    const { data, error } = await req.supabase
       .from('personas')
       .update(updateData)
       .eq('id', id)
@@ -192,7 +225,7 @@ router.put('/:id', verifyAuth, async (req, res) => {
     res.status(200).json({
       success: true,
       message: 'Persona updated successfully',
-      persona: data
+      persona: normalizeBudgetFields(data)
     });
 
   } catch (error) {
@@ -209,7 +242,7 @@ router.delete('/:id', verifyAuth, async (req, res) => {
   try {
     const { id } = req.params;
 
-    const { error } = await supabase
+    const { error } = await req.supabase
       .from('personas')
       .delete()
       .eq('id', id)

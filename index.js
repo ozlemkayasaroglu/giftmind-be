@@ -11,6 +11,8 @@ const authRoutes = require('./routes/auth');
 const personasRoutes = require('./routes/personas');
 const personaRoutes = require('./routes/persona');
 const giftRoutes = require('./routes/gift');
+const milestonesRoutes = require('./routes/milestones');
+const eventsRoutes = require('./routes/events');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -61,6 +63,19 @@ app.use('/api', authRoutes);
 app.use('/api/personas', verifyAuth, personasRoutes);
 app.use('/api/persona', verifyAuth, personaRoutes);
 app.use('/api/gift', giftRoutes);
+app.use('/api', verifyAuth, milestonesRoutes);
+app.use('/api', verifyAuth, eventsRoutes);
+
+// JSON 404 fallback (avoid HTML error pages in prod)
+app.use((req, res, next) => {
+  res.status(404).json({ success: false, message: 'Not Found', path: req.originalUrl });
+});
+
+// Generic error handler
+app.use((err, req, res, next) => {
+  console.error('Unhandled error:', err);
+  res.status(500).json({ success: false, message: 'Internal Server Error' });
+});
 
 // Basic route for testing
 app.get('/', (req, res) => {

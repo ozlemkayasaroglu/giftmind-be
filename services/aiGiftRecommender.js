@@ -1,12 +1,17 @@
 /**
  * AI Gift Recommender Service
- * Generates personalized gift ideas based on persona information using Hugging Face AI
+ * Generates personalized gift ideas based on persona information using Gemini (Google Generative AI)
  */
 
-const { HfInference } = require('@huggingface/inference');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 
-// Initialize Hugging Face client
-const hf = new HfInference(process.env.HUGGING_FACE_TOKEN);
+// Initialize Gemini client (set GEMINI_API_KEY in environment)
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-1.5-flash';
+let genAI = null;
+if (GEMINI_API_KEY) {
+  try { genAI = new GoogleGenerativeAI(GEMINI_API_KEY); } catch (_) { genAI = null; }
+}
 
 // Backup gift database for fallback scenarios
 const giftDatabase = {
@@ -63,7 +68,7 @@ const giftDatabase = {
 // Default gifts for different age groups
 const ageBasedGifts = {
   child: ['Eğitici oyuncak seti', 'Çocuk kitap koleksiyonu', 'Sanat malzemeleri kutusu'],
-  young: ['Bluetooth kulaklık', 'Trendy aksesuar', 'Deneyim hediyesi'],
+  young: ['Bluetooth kulaklık', 'Trendy aksesuar', 'Deneyim hediye kartı'],
   adult: ['Premium ev tekstili', 'Kişisel bakım seti', 'Hobiye özel hediye'],
   senior: ['Rahat ev ayakkabısı', 'Nostaljik müzik koleksiyonu', 'Bahçe bitkileri']
 };
@@ -166,23 +171,24 @@ function getGiftsFromNotes(notes) {
  * Create a detailed prompt for the AI model
  */
 function createGiftPrompt(persona) {
-  const { name, interests, birth_date, notes } = persona;
+  const { name, interests, birth_date, notes, description } = persona;
   const age = calculateAge(birth_date);
   const ageCategory = getAgeCategory(age);
   
   let prompt = `Generate 3 personalized gift recommendations for ${name}.\n\n`;
   
-  // Add age information
   if (age) {
     prompt += `Age: ${age} years old (${ageCategory})\n`;
   }
   
-  // Add interests
   if (interests && interests.length > 0) {
     prompt += `Interests: ${interests.join(', ')}\n`;
   }
   
-  // Add notes
+  if (description) {
+    prompt += `Description: ${String(description)}\n`;
+  }
+  
   if (notes && notes.length > 0) {
     prompt += `Additional notes: ${notes.join(', ')}\n`;
   }
@@ -192,7 +198,7 @@ function createGiftPrompt(persona) {
 2. [Gift Name] - [Brief reason why this gift suits them]
 3. [Gift Name] - [Brief reason why this gift suits them]
 
-Focus on practical, meaningful gifts that align with their interests and personality.`;
+Focus on practical, meaningful gifts that align with their interests, age, and description.`;
   
   return prompt;
 }
@@ -238,100 +244,98 @@ function parseAIResponse(response, persona) {
  * Fallback function using the original mock logic
  */
 function generateFallbackGifts(persona) {
-  const { name, interests, birth_date, notes } = persona;
+  const { interests, birth_date, notes, description } = persona;
   
   let giftIdeas = [];
   
-  // Get gifts based on interests
+  // Interests-based
   const interestGifts = getGiftsFromInterests(interests);
   giftIdeas.push(...interestGifts);
   
-  // Get gifts based on notes
-  const noteGifts = getGiftsFromNotes(notes);
+  // Notes + description based
+  const combinedNotes = Array.isArray(notes) ? [...notes] : [];
+  if (description) combinedNotes.push(String(description));
+  const noteGifts = getGiftsFromNotes(combinedNotes);
   giftIdeas.push(...noteGifts);
   
-  // Add age-appropriate gifts
+  // Age-based
   const age = calculateAge(birth_date);
   const ageCategory = getAgeCategory(age);
   const ageGifts = ageBasedGifts[ageCategory] || ageBasedGifts.adult;
   giftIdeas.push(...ageGifts);
   
-  // Remove duplicates and shuffle
+  // Dedup & fill
   giftIdeas = [...new Set(giftIdeas)];
-  
   if (giftIdeas.length < 3) {
-    const remainingCount = 3 - giftIdeas.length;
+    const remaining = 3 - giftIdeas.length;
     const shuffledGeneric = [...genericGifts].sort(() => Math.random() - 0.5);
-    giftIdeas.push(...shuffledGeneric.slice(0, remainingCount));
+    giftIdeas.push(...shuffledGeneric.slice(0, remaining));
   }
   
-  const shuffledGifts = giftIdeas.sort(() => Math.random() - 0.5);
-  const selectedGifts = shuffledGifts.slice(0, 3);
-  
-  return selectedGifts.map((gift, index) => ({
+  const selected = [...giftIdeas].sort(() => Math.random() - 0.5).slice(0, 3);
+  return selected.map((gift, index) => ({
     id: index + 1,
     title: gift,
     reason: generateReason(gift, persona),
-    confidence: Math.floor(Math.random() * 30) + 70 // 70-100% confidence
+    confidence: Math.floor(Math.random() * 30) + 70
   }));
 }
 
 /**
- * Generate personalized gift recommendations using Hugging Face AI
+ * Generate personalized gift recommendations using Gemini (Google Generative AI)
  */
 async function generateGiftIdeas(persona) {
   try {
     const { name } = persona;
-    
-    // Validate input
-    if (!name) {
-      throw new Error('Persona name is required');
-    }
-    
+    if (!name) throw new Error('Persona name is required');
+
     const age = calculateAge(persona.birth_date);
     const ageCategory = getAgeCategory(age);
-    
+
     let recommendations = [];
-    
-  // Check if Hugging Face token is available
-  if (!process.env.HUGGING_FACE_TOKEN) {
-    console.warn('Hugging Face token not found, using fallback recommendations');
-    recommendations = generateFallbackGifts(persona);
-  } else {
-    try {
-      // Always use fallback for now to ensure working recommendations
-      console.log('Using fallback recommendations for reliability');
-      recommendations = generateFallbackGifts(persona);
-    } catch (aiError) {
-      console.error('AI error:', aiError.message);
-      console.log('Falling back to mock recommendations for:', name);
+    let usedAI = false;
+
+    // Prefer Gemini if API key is available
+    if (genAI) {
+      try {
+        const model = genAI.getGenerativeModel({ model: GEMINI_MODEL });
+        const prompt = createGiftPrompt(persona);
+        const resp = await model.generateContent(prompt);
+        const text = resp?.response?.text ? resp.response.text() : (await resp.text?.()) || '';
+        if (text && typeof text === 'string') {
+          const parsed = parseAIResponse(text, persona);
+          if (parsed && parsed.length >= 1) {
+            recommendations = parsed;
+            usedAI = true;
+          }
+        }
+      } catch (e) {
+        console.warn('Gemini error, falling back:', e?.message || e);
+      }
+    }
+
+    if (!recommendations.length) {
       recommendations = generateFallbackGifts(persona);
     }
-  }    // Ensure we always have 3 recommendations
+
     while (recommendations.length < 3) {
-      const fallbackGifts = generateFallbackGifts(persona);
-      recommendations.push(...fallbackGifts.slice(0, 3 - recommendations.length));
+      const extra = generateFallbackGifts(persona);
+      recommendations.push(...extra.slice(0, 3 - recommendations.length));
     }
-    
-    // Format final response
+
     return {
       success: true,
       personaName: name,
-      age: age,
-      ageCategory: ageCategory,
-      recommendations: recommendations.slice(0, 3), // Ensure exactly 3 recommendations
+      age,
+      ageCategory,
+      recommendations: recommendations.slice(0, 3),
       generatedAt: new Date().toISOString(),
-      aiGenerated: process.env.HUGGING_FACE_TOKEN ? true : false,
+      aiGenerated: usedAI,
       totalOptions: recommendations.length
     };
-    
   } catch (error) {
     console.error('Gift recommendation error:', error);
-    return {
-      success: false,
-      error: error.message,
-      recommendations: []
-    };
+    return { success: false, error: error.message, recommendations: [] };
   }
 }
 
@@ -339,9 +343,8 @@ async function generateGiftIdeas(persona) {
  * Generate reasoning for gift recommendation
  */
 function generateReason(gift, persona) {
-  const { name, interests, notes } = persona;
+  const { name, interests, notes, description } = persona;
   
-  // Simple reasoning based on keywords
   const reasonTemplates = [
     `${name} için ilgi alanlarına uygun seçim`,
     `Kişisel notlarına dayanarak önerilen hediye`,
@@ -350,19 +353,28 @@ function generateReason(gift, persona) {
     `Kişisel özelliklerine uygun düşünülmüş hediye`
   ];
   
-  // Check if gift relates to specific interests or notes
+  // Match interests
   if (interests && Array.isArray(interests)) {
     for (const interest of interests) {
-      if (gift.toLowerCase().includes(interest.toLowerCase()) || 
+      if (gift.toLowerCase().includes(interest.toLowerCase()) ||
           interest.toLowerCase().includes(gift.toLowerCase().split(' ')[0])) {
         return `${interest} ilgisine uygun özel seçim`;
       }
     }
   }
   
-  // Return random template
-  const randomIndex = Math.floor(Math.random() * reasonTemplates.length);
-  return reasonTemplates[randomIndex];
+  // Match description keywords
+  if (description) {
+    const desc = String(description).toLowerCase();
+    const g = gift.toLowerCase();
+    if (desc.includes('yoga') || g.includes('yoga')) return 'Açıklamasındaki yoga ilgisine uygun seçim';
+    if (desc.includes('müzik') || g.includes('müzik') || g.includes('music')) return 'Müzik zevkine hitap eden bir tercih';
+    if (desc.includes('bahçe') || desc.includes('bahçıvanlık') || g.includes('bahçe')) return 'Bahçe ilgisine uygun düşünülmüş hediye';
+    if (desc.includes('kitap') || desc.includes('okuma') || g.includes('kitap')) return 'Okuma sevgisine uygun bir hediye';
+    if (desc.includes('kahve') || g.includes('kahve') || g.includes('coffee')) return 'Kahve keyfine uygun seçim';
+  }
+  
+  return reasonTemplates[Math.floor(Math.random() * reasonTemplates.length)];
 }
 
 /**

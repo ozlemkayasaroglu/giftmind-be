@@ -22,6 +22,7 @@
   },
   "homepage": "https://github.com/ozlemkayasaroglu/giftmind-be#readme",
   "dependencies": {
+    "@google/generative-ai": "^0.21.0",
     "@huggingface/inference": "^4.11.3",
     "@supabase/supabase-js": "^2.76.0",
     "axios": "^1.12.2",

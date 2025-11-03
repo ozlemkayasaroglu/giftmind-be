@@ -171,35 +171,93 @@ function getGiftsFromNotes(notes) {
  * Create a detailed prompt for the AI model
  */
 function createGiftPrompt(persona) {
-  const { name, interests, birth_date, notes, description } = persona;
+  const {
+    name,
+    interests,
+    birth_date,
+    notes,
+    description,
+    // New enriched fields
+    role,
+    age_min,
+    age_max,
+    goals,
+    challenges,
+    interests_raw,
+    behavioral_insights,
+    budget_min,
+    budget_max,
+    // Aliases from frontend
+    preferences,
+    behavioralInsights,
+    // Events list injected by API
+    events
+  } = persona || {};
+
   const age = calculateAge(birth_date);
   const ageCategory = getAgeCategory(age);
-  
+
   let prompt = `Generate 3 personalized gift recommendations for ${name}.\n\n`;
-  
+
+  // Age details
   if (age) {
     prompt += `Age: ${age} years old (${ageCategory})\n`;
+  } else if (age_min != null || age_max != null) {
+    const rangeText = `${age_min != null ? age_min : '?'}-${age_max != null ? age_max : '?'}`;
+    prompt += `Age range: ${rangeText}\n`;
   }
-  
-  if (interests && interests.length > 0) {
-    prompt += `Interests: ${interests.join(', ')}\n`;
+
+  if (role) prompt += `Role: ${String(role)}\n`;
+  if (goals) prompt += `Goals: ${String(goals)}\n`;
+  if (challenges) prompt += `Challenges: ${String(challenges)}\n`;
+
+  const interestList = Array.isArray(interests) && interests.length
+    ? interests
+    : (Array.isArray(preferences) ? preferences : []);
+  if (interestList.length > 0) {
+    prompt += `Interests: ${interestList.join(', ')}\n`;
   }
-  
+  if (interests_raw) {
+    prompt += `Interests (free text): ${String(interests_raw)}\n`;
+  }
+
   if (description) {
     prompt += `Description: ${String(description)}\n`;
   }
-  
-  if (notes && notes.length > 0) {
+  if (notes && Array.isArray(notes) && notes.length > 0) {
     prompt += `Additional notes: ${notes.join(', ')}\n`;
   }
-  
-  prompt += `\nPlease provide 3 specific, thoughtful gift ideas with brief explanations. Format each recommendation as:
-1. [Gift Name] - [Brief reason why this gift suits them]
-2. [Gift Name] - [Brief reason why this gift suits them]
-3. [Gift Name] - [Brief reason why this gift suits them]
 
-Focus on practical, meaningful gifts that align with their interests, age, and description.`;
-  
+  const insights = behavioral_insights ?? behavioralInsights;
+  if (insights) {
+    prompt += `Behavioral insights: ${String(insights)}\n`;
+  }
+
+  // Recent events (up to 5)
+  if (Array.isArray(events) && events.length) {
+    const recent = events.slice(0, 5).map(e => {
+      const d = e.occurred_at ? new Date(e.occurred_at).toISOString().split('T')[0] : '';
+      const t = e.title || e.event_type || '';
+      const desc = e.description || '';
+      return `- ${t}${d ? ` (${d})` : ''}${desc ? `: ${desc}` : ''}`;
+    }).join('\n');
+    prompt += `Recent life events that may influence preferences:\n${recent}\n`;
+  }
+
+  if (budget_min != null || budget_max != null) {
+    const budgetText = `${budget_min != null ? budget_min : '0'} - ${budget_max != null ? budget_max : '∞'}`;
+    prompt += `Budget range: ${budgetText}\n`;
+  }
+
+  prompt += `\nInstructions:\n`;
+  prompt += `- Provide 3 specific, thoughtful gift ideas tailored to the information above.\n`;
+  prompt += `- Keep suggestions within the budget range if provided.\n`;
+  prompt += `- Prefer gifts aligned with interests, role, goals, challenges, description, behavioral insights, and recent events.\n`;
+  prompt += `- Briefly explain why each gift matches.\n`;
+  prompt += `- Avoid generic items unless strongly justified.\n`;
+  prompt += `\nOutput format:\n`;
+  prompt += `1. [Gift Name] - [Why it fits]\n2. [Gift Name] - [Why it fits]\n3. [Gift Name] - [Why it fits]\n`;
+
   return prompt;
 }
 

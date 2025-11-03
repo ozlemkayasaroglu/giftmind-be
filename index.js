@@ -63,22 +63,11 @@ const verifyAuth = async (req, res, next) => {
 app.use('/api', authRoutes);
 app.use('/api/personas', verifyAuth, personasRoutes);
 app.use('/api/persona', verifyAuth, personaRoutes);
-app.use('/api/gift', giftRoutes);
+app.use('/api/gift', verifyAuth, giftRoutes);
 app.use('/api', verifyAuth, milestonesRoutes);
 app.use('/api', verifyAuth, eventsRoutes);
 
-// JSON 404 fallback (avoid HTML error pages in prod)
-app.use((req, res, next) => {
-  res.status(404).json({ success: false, message: 'Not Found', path: req.originalUrl });
-});
-
-// Generic error handler
-app.use((err, req, res, next) => {
-  console.error('Unhandled error:', err);
-  res.status(500).json({ success: false, message: 'Internal Server Error' });
-});
-
-// Basic route for testing
+// Basic route for testing (must be before 404 handler)
 app.get('/', (req, res) => {
   res.json({ 
     message: 'Welcome to GiftMind Backend API',
@@ -116,7 +105,7 @@ app.get('/', (req, res) => {
   });
 });
 
-// Health check endpoint
+// Health check endpoint (must be before 404 handler)
 app.get('/health', (req, res) => {
   const dbStatus = mongoose.connection.readyState === 1 ? 'Connected' : 'Disconnected';
   res.json({ 
@@ -128,12 +117,11 @@ app.get('/health', (req, res) => {
   });
 });
 
-// Supabase test endpoint
+// Supabase test endpoint (must be before 404 handler)
 app.get('/supabase-test', async (req, res) => {
   try {
     // Test Supabase connection by checking the URL
     const { data, error } = await supabase.from('test').select('*').limit(1);
-    
     res.json({
       message: 'Supabase client is working',
       status: 'success',
@@ -148,6 +136,17 @@ app.get('/supabase-test', async (req, res) => {
       error: err.message
     });
   }
+});
+
+// JSON 404 fallback (avoid HTML error pages in prod)
+app.use((req, res, next) => {
+  res.status(404).json({ success: false, message: 'Not Found', path: req.originalUrl });
+});
+
+// Generic error handler
+app.use((err, req, res, next) => {
+  console.error('Unhandled error:', err);
+  res.status(500).json({ success: false, message: 'Internal Server Error' });
 });
 
 // Start server

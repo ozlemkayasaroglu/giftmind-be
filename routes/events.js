@@ -4,9 +4,9 @@ const router = express.Router();
 // All endpoints here expect req.supabase and req.user set by verifyAuth (index.js)
 
 function normalizeId(id) {
+  // UUID-friendly: always return trimmed string
   if (id === null || id === undefined) return id;
-  const s = String(id).trim();
-  return /^\d+$/.test(s) ? Number(s) : s;
+  return String(id).trim();
 }
 
 async function ensurePersonaOwnership(req, res, next) {
@@ -19,6 +19,7 @@ async function ensurePersonaOwnership(req, res, next) {
     const personaId = normalizeId(rawId);
 
     const { data: persona, error } = await req.supabase
+      .schema('private')
       .from("personas")
       .select("id")
       .eq("id", personaId)
@@ -46,6 +47,7 @@ router.get("/personas/:id/events", ensurePersonaOwnership, async (req, res) => {
   try {
     const personaId = normalizeId(req.params.id);
     const { data, error } = await req.supabase
+      .schema('private')
       .from("persona_events")
       .select("*")
       .eq("persona_id", personaId)
@@ -62,53 +64,33 @@ router.get("/personas/:id/events", ensurePersonaOwnership, async (req, res) => {
   }
 });
 
-// Create event for a persona (schema: event_type, title, description, occurred_at, source, metadata, is_active)
+// Create event for a persona (schema: title, details, category, type, occurred_at, user_id)
 router.post(
   "/personas/:id/events",
   ensurePersonaOwnership,
   async (req, res) => {
     try {
       const personaId = normalizeId(req.params.id);
-      const {
-        title,
-        description,
-        event_type,
-        occurred_at,
-        source,
-        metadata,
-        is_active,
-      } = req.body || {};
+      const { title, details, occurred_at, category, type } = req.body || {};
 
       if (!title)
         return res
           .status(400)
           .json({ success: false, message: "title is required" });
-      if (!event_type)
-        return res
-          .status(400)
-          .json({ success: false, message: "event_type is required" });
-
-      let meta = metadata;
-      if (typeof meta === "string") {
-        try {
-          meta = JSON.parse(meta);
-        } catch {
-          meta = {};
-        }
-      }
 
       const row = {
         persona_id: personaId,
-        event_type,
+        user_id: req.user.id,
         title,
-        description: description ?? null,
+        details: details ?? null,
         occurred_at: occurred_at || null,
-        source: source ?? null,
-        metadata: meta ?? {},
-        is_active: typeof is_active === "boolean" ? is_active : true,
+        category: category ?? null,
+        type: type ?? null,
+        is_active: true,
       };
 
       const { data, error } = await req.supabase
+        .schema('private')
         .from("persona_events")
         .insert([row])
         .select("*")
@@ -125,23 +107,27 @@ router.post(
   }
 );
 
-// Update event
+// Update event (allow editing title, details, category, type, occurred_at, is_active)
 router.put("/events/:eid", async (req, res) => {
   try {
     const eid = normalizeId(req.params.eid);
 
-    let patch = { ...req.body };
-    delete patch.persona_id; // Do not allow moving events between personas here
-
-    if (typeof patch.metadata === "string") {
-      try {
-        patch.metadata = JSON.parse(patch.metadata);
-      } catch {
-        delete patch.metadata;
-      }
+    const allowed = [
+      "title",
+      "details",
+      "category",
+      "type",
+      "occurred_at",
+      "is_active",
+    ];
+    const patch = {};
+    for (const k of allowed) {
+      if (k in req.body) patch[k] = req.body[k];
     }
+    // Do not allow persona_id or user_id changes
 
     const { data, error } = await req.supabase
+      .schema('private')
       .from("persona_events")
       .update(patch)
       .eq("id", eid)
@@ -163,6 +149,7 @@ router.delete("/events/:eid", async (req, res) => {
   try {
     const eid = normalizeId(req.params.eid);
     const { error } = await req.supabase
+      .schema('private')
       .from("persona_events")
       .delete()
       .eq("id", eid);

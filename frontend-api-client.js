@@ -1,5 +1,20 @@
 // Frontend API Client - PersonaForm entegrasyonu için
 // Bu dosya frontend'de kullanılacak API client fonksiyonlarını içerir
+//
+// Desteklenen alanlar ve camelCase aliasları:
+// - name (required)
+// - role
+// - goals
+// - challenges
+// - description
+// - interests (array)
+// - personality_traits / personalityTraits (array)
+// - budget_min / budgetMin (number)
+// - budget_max / budgetMax (number)
+// - behavioral_insights / behavioralInsights (string)
+// - notes (string)
+// - birth_date / birthDate (date string)
+// - metadata (object)
 
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ||
@@ -45,30 +60,94 @@ async function apiRequest(endpoint, options = {}) {
   }
 }
 
+// Helper function to map frontend form data to backend API format
+function mapFormDataToAPI(formData) {
+  return {
+    // Required field
+    name: formData.name,
+
+    // Simple fields
+    role: formData.role || null,
+    goals: formData.goals || null,
+    challenges: formData.challenges || null,
+    description: formData.description || null,
+    interests: formData.interests || [],
+    notes: formData.notes || null,
+    metadata: formData.metadata || {},
+
+    // Fields with camelCase aliases
+    personality_traits:
+      formData.personalityTraits || formData.personality_traits || [],
+    budget_min: formData.budgetMin || formData.budget_min || null,
+    budget_max: formData.budgetMax || formData.budget_max || null,
+    behavioral_insights:
+      formData.behavioralInsights || formData.behavioral_insights || null,
+    birth_date: formData.birthDate || formData.birth_date || null,
+  };
+}
+
+// Helper function to create update payload (only includes defined fields)
+function createUpdatePayload(formData) {
+  const payload = {};
+
+  // Simple fields
+  if (formData.name !== undefined) payload.name = formData.name;
+  if (formData.role !== undefined) payload.role = formData.role;
+  if (formData.goals !== undefined) payload.goals = formData.goals;
+  if (formData.challenges !== undefined)
+    payload.challenges = formData.challenges;
+  if (formData.description !== undefined)
+    payload.description = formData.description;
+  if (formData.interests !== undefined) payload.interests = formData.interests;
+  if (formData.notes !== undefined) payload.notes = formData.notes;
+  if (formData.metadata !== undefined) payload.metadata = formData.metadata;
+
+  // Fields with camelCase aliases - prioritize camelCase
+  if (formData.personalityTraits !== undefined) {
+    payload.personality_traits = formData.personalityTraits;
+  } else if (formData.personality_traits !== undefined) {
+    payload.personality_traits = formData.personality_traits;
+  }
+
+  if (formData.budgetMin !== undefined) {
+    payload.budget_min = formData.budgetMin;
+  } else if (formData.budget_min !== undefined) {
+    payload.budget_min = formData.budget_min;
+  }
+
+  if (formData.budgetMax !== undefined) {
+    payload.budget_max = formData.budgetMax;
+  } else if (formData.budget_max !== undefined) {
+    payload.budget_max = formData.budget_max;
+  }
+
+  if (formData.behavioralInsights !== undefined) {
+    payload.behavioral_insights = formData.behavioralInsights;
+  } else if (formData.behavioral_insights !== undefined) {
+    payload.behavioral_insights = formData.behavioral_insights;
+  }
+
+  if (formData.birthDate !== undefined) {
+    payload.birth_date = formData.birthDate;
+  } else if (formData.birth_date !== undefined) {
+    payload.birth_date = formData.birth_date;
+  }
+
+  // Active status
+  if (formData.isActive !== undefined) {
+    payload.is_active = formData.isActive;
+  } else if (formData.is_active !== undefined) {
+    payload.is_active = formData.is_active;
+  }
+
+  return payload;
+}
+
 // PersonaForm API functions
 export const personaAPI = {
-  // Create persona from PersonaForm data (matches exact Supabase table structure)
+  // Create persona from PersonaForm data (supports both camelCase and snake_case)
   async create(formData) {
-    const payload = {
-      // Required fields
-      name: formData.name,
-
-      // Optional fields matching table structure
-      role: formData.role || null,
-      goals: formData.goals || null,
-      challenges: formData.challenges || null,
-      description: formData.description || formData.notes || null,
-      interests: formData.interests || [],
-      personality_traits:
-        formData.personalityTraits || formData.personality_traits || [],
-      budget_min: formData.budgetMin || formData.budget_min || null,
-      budget_max: formData.budgetMax || formData.budget_max || null,
-      behavioral_insights:
-        formData.behavioralInsights || formData.behavioral_insights || null,
-      notes: formData.notes || null,
-      birth_date: formData.birthDate || formData.birth_date || null,
-      metadata: formData.metadata || {},
-    };
+    const payload = mapFormDataToAPI(formData);
 
     return apiRequest("/api/personas", {
       method: "POST",
@@ -76,59 +155,9 @@ export const personaAPI = {
     });
   },
 
-  // Update persona from PersonaForm data (matches exact Supabase table structure)
+  // Update persona from PersonaForm data (supports both camelCase and snake_case)
   async update(personaId, formData) {
-    const payload = {
-      // Only include fields that are provided
-      ...(formData.name !== undefined && { name: formData.name }),
-      ...(formData.role !== undefined && { role: formData.role }),
-      ...(formData.goals !== undefined && { goals: formData.goals }),
-      ...(formData.challenges !== undefined && {
-        challenges: formData.challenges,
-      }),
-      ...(formData.description !== undefined && {
-        description: formData.description,
-      }),
-      ...(formData.interests !== undefined && {
-        interests: formData.interests,
-      }),
-      ...(formData.personalityTraits !== undefined && {
-        personality_traits: formData.personalityTraits,
-      }),
-      ...(formData.personality_traits !== undefined && {
-        personality_traits: formData.personality_traits,
-      }),
-      ...(formData.budgetMin !== undefined && {
-        budget_min: formData.budgetMin,
-      }),
-      ...(formData.budget_min !== undefined && {
-        budget_min: formData.budget_min,
-      }),
-      ...(formData.budgetMax !== undefined && {
-        budget_max: formData.budgetMax,
-      }),
-      ...(formData.budget_max !== undefined && {
-        budget_max: formData.budget_max,
-      }),
-      ...(formData.behavioralInsights !== undefined && {
-        behavioral_insights: formData.behavioralInsights,
-      }),
-      ...(formData.behavioral_insights !== undefined && {
-        behavioral_insights: formData.behavioral_insights,
-      }),
-      ...(formData.notes !== undefined && { notes: formData.notes }),
-      ...(formData.birthDate !== undefined && {
-        birth_date: formData.birthDate,
-      }),
-      ...(formData.birth_date !== undefined && {
-        birth_date: formData.birth_date,
-      }),
-      ...(formData.isActive !== undefined && { is_active: formData.isActive }),
-      ...(formData.is_active !== undefined && {
-        is_active: formData.is_active,
-      }),
-      ...(formData.metadata !== undefined && { metadata: formData.metadata }),
-    };
+    const payload = createUpdatePayload(formData);
 
     return apiRequest(`/api/personas/${personaId}`, {
       method: "PUT",
@@ -301,4 +330,42 @@ function PersonaFormComponent() {
     />
   );
 }
+
+// Example form data with all supported fields:
+const exampleFormData = {
+  // Required
+  name: "Ahmet Yılmaz",
+  
+  // Basic info
+  role: "Yazılım Geliştirici",
+  goals: "Teknik becerilerini geliştirmek ve takım lideri olmak",
+  challenges: "İş-yaşam dengesi kurmak ve stres yönetimi",
+  description: "Teknoloji tutkunu, kahve seven, kitap okuyan bir geliştirici",
+  
+  // Arrays
+  interests: ["teknoloji", "kahve", "kitap okuma", "bisiklet"],
+  personalityTraits: ["analitik", "perfeksiyonist", "teknoloji meraklısı"], // camelCase
+  // OR: personality_traits: ["analitik", "perfeksiyonist"], // snake_case
+  
+  // Budget (both formats supported)
+  budgetMin: 200, // camelCase
+  budgetMax: 1000, // camelCase
+  // OR: budget_min: 200, budget_max: 1000 // snake_case
+  
+  // Behavioral insights (both formats supported)
+  behavioralInsights: "Kaliteli ürünleri tercih eder, araştırma yapar", // camelCase
+  // OR: behavioral_insights: "Kaliteli ürünleri tercih eder" // snake_case
+  
+  // Personal details
+  notes: "Sabah kahve ritüeli çok önemli, yeni teknolojileri takip ediyor",
+  birthDate: "1985-12-20", // camelCase
+  // OR: birth_date: "1985-12-20" // snake_case
+  
+  // Metadata
+  metadata: {
+    source: "web_form",
+    version: "2.0",
+    tags: ["tech", "professional"]
+  }
+};
 */

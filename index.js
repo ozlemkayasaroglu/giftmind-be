@@ -139,6 +139,27 @@ app.get("/health", (req, res) => {
   });
 });
 
+// Environment check endpoint for Railway debugging
+app.get("/env-check", (req, res) => {
+  res.json({
+    message: "Environment variables check",
+    status: "success",
+    env: {
+      NODE_ENV: process.env.NODE_ENV || "not set",
+      PORT: process.env.PORT || "not set",
+      SUPABASE_URL: process.env.SUPABASE_URL ? "✅ set" : "❌ missing",
+      SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY
+        ? "✅ set"
+        : "❌ missing",
+      GEMINI_API_KEY: process.env.GEMINI_API_KEY ? "✅ set" : "❌ missing",
+      GEMINI_MODEL: process.env.GEMINI_MODEL || "not set",
+    },
+    nodeVersion: process.version,
+    platform: process.platform,
+    timestamp: new Date().toISOString(),
+  });
+});
+
 // Supabase test endpoint (must be before 404 handler)
 app.get("/supabase-test", async (req, res) => {
   try {
@@ -173,10 +194,38 @@ app.use((err, req, res, next) => {
   res.status(500).json({ success: false, message: "Internal Server Error" });
 });
 
-// Start server
-app.listen(PORT, () => {
+// Start server with error handling
+const server = app.listen(PORT, () => {
   console.log(`🚀 Server is running on port ${PORT}`);
   console.log(`📍 Server URL: http://localhost:${PORT}`);
+  console.log(`🌍 Environment: ${process.env.NODE_ENV || "development"}`);
+  console.log(`📦 Node.js version: ${process.version}`);
+});
+
+// Handle server startup errors
+server.on("error", (error) => {
+  console.error("❌ Server startup error:", error);
+  if (error.code === "EADDRINUSE") {
+    console.error(`Port ${PORT} is already in use`);
+  }
+  process.exit(1);
+});
+
+// Graceful shutdown
+process.on("SIGTERM", () => {
+  console.log("🛑 SIGTERM received, shutting down gracefully");
+  server.close(() => {
+    console.log("✅ Server closed");
+    process.exit(0);
+  });
+});
+
+process.on("SIGINT", () => {
+  console.log("🛑 SIGINT received, shutting down gracefully");
+  server.close(() => {
+    console.log("✅ Server closed");
+    process.exit(0);
+  });
 });
 
 module.exports = app;

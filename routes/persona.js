@@ -109,8 +109,6 @@ router.post("/", async (req, res) => {
       interests: toArray(interests),
       notes: Array.isArray(notes) ? notes : toArray(notes),
       role: role ?? null,
-      age_min: toIntOrNull(ageMin),
-      age_max: toIntOrNull(ageMax),
       goals: goals ?? null,
       challenges: challenges ?? null,
       description: description ?? null,

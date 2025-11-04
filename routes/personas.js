@@ -1,11 +1,5 @@
 const express = require("express");
-// Removed unused supabase/createClient; rely on index.js verifyAuth to set req.supabase & req.user
 const router = express.Router();
-const {
-  parseBudgetFromBody,
-  applyBudgetToData,
-  normalizeBudgetFields,
-} = require("../utils/personaBudget");
 
 // Helper to coerce array-like fields
 function toArray(val) {
@@ -25,26 +19,33 @@ function toIntOrNull(v) {
   return Number.isNaN(n) ? null : n;
 }
 
-// Map DB row -> camelCase + aliases used by frontend
+// Map DB row to frontend format
 function mapPersonaRow(row) {
   if (!row) return row;
-  const nb = normalizeBudgetFields(row);
   return {
-    ...nb,
-    ageMin: nb.age_min ?? null,
-    ageMax: nb.age_max ?? null,
-    budgetMin: nb.budget_min ?? null,
-    budgetMax: nb.budget_max ?? null,
-    interestsInput: nb.interests_raw ?? null,
-    behavioralInsights: nb.behavioral_insights ?? null,
-    notesText: nb.notes_text ?? null,
-    // aliases
-    preferences: Array.isArray(nb.interests) ? nb.interests : [],
-    goals: nb.goals ?? null,
-    challenges: nb.challenges ?? null,
-    role: nb.role ?? null,
-    description: nb.description ?? null,
-    notes: Array.isArray(nb.notes) ? nb.notes : nb.notes ? [nb.notes] : [],
+    id: row.id,
+    user_id: row.user_id,
+    name: row.name,
+    role: row.role,
+    goals: row.goals,
+    challenges: row.challenges,
+    description: row.description,
+    interests: row.interests || [],
+    personality_traits: row.personality_traits || [],
+    budget_min: row.budget_min,
+    budget_max: row.budget_max,
+    behavioral_insights: row.behavioral_insights,
+    notes: row.notes,
+    birth_date: row.birth_date,
+    is_active: row.is_active,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+    metadata: row.metadata || {},
+    // Frontend aliases
+    budgetMin: row.budget_min,
+    budgetMax: row.budget_max,
+    birthDate: row.birth_date,
+    personalityTraits: row.personality_traits || [],
   };
 }
 
@@ -70,10 +71,9 @@ router.get("/", async (req, res) => {
   }
 });
 
-// POST /api/personas - Create new persona (aligned with PersonaForm)
+// POST /api/personas - Create new persona
 router.post("/", async (req, res) => {
   try {
-    // 🐛 DEBUG: Log incoming request to check what frontend sends
     console.log(
       "📥 POST /api/personas - Request Body:",
       JSON.stringify(req.body, null, 2)
@@ -81,83 +81,54 @@ router.post("/", async (req, res) => {
 
     const {
       name,
-      birth_date,
-      birthDate, // PersonaForm uses camelCase
-      interests,
-      notes,
-      description,
-      // Additional form fields (may not come from PersonaForm yet)
       role,
-      ageMin,
-      ageMax,
       goals,
       challenges,
-      interestsInput,
-      behavioralInsights,
-      budgetMin,
-      budgetMax,
+      description,
+      interests,
+      personality_traits,
+      personalityTraits, // camelCase alias
+      budget_min,
+      budget_max,
+      budgetMin, // camelCase alias
+      budgetMax, // camelCase alias
+      behavioral_insights,
+      behavioralInsights, // camelCase alias
+      notes,
+      birth_date,
+      birthDate, // camelCase alias
+      metadata,
     } = req.body || {};
 
-    // 🐛 DEBUG: Log what we extracted
-    console.log("🔍 Extracted fields:", {
-      name,
-      birthDate,
-      interests,
-      notes,
-      description,
-      role,
-      ageMin,
-      ageMax,
-      goals,
-      challenges,
-      interestsInput,
-      behavioralInsights,
-      budgetMin,
-      budgetMax,
-    });
-
     if (!name) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Name is required" });
+      return res.status(400).json({
+        success: false,
+        message: "Name is required",
+      });
     }
 
-    // Prepare persona data - support both snake_case and camelCase
-    let personaData = {
+    // Prepare persona data matching exact table structure
+    const personaData = {
       user_id: req.user.id,
-      name,
-      birth_date: birth_date || birthDate || null, // Support both formats
-      interests: toArray(interests),
-      notes: Array.isArray(notes) ? notes : toArray(notes),
-      // PersonaForm notes -> description mapping
-      description: description || (typeof notes === "string" ? notes : null),
-      notes_text: typeof notes === "string" ? notes : null,
-      // Additional fields - PersonaForm'dan gelmeyebilir, o yüzden null bırak
+      name: name.trim(),
       role: role || null,
-      age_min: toIntOrNull(ageMin),
-      age_max: toIntOrNull(ageMax),
       goals: goals || null,
       challenges: challenges || null,
-      interests_raw: interestsInput || null,
-      behavioral_insights: behavioralInsights || null,
+      description: description || null,
+      interests: toArray(interests),
+      personality_traits: toArray(personality_traits || personalityTraits),
+      budget_min: toIntOrNull(budget_min || budgetMin),
+      budget_max: toIntOrNull(budget_max || budgetMax),
+      behavioral_insights: behavioral_insights || behavioralInsights || null,
+      notes: notes || null,
+      birth_date: birth_date || birthDate || null,
+      is_active: true,
+      metadata: metadata || {},
     };
 
-    // 🐛 DEBUG: Log final personaData before DB insert
     console.log(
       "💾 Final personaData for DB:",
       JSON.stringify(personaData, null, 2)
-    );
-
-    // Budget: support budgetMin/budgetMax in addition to existing shapes
-    const budgetParsed = parseBudgetFromBody({
-      ...req.body,
-      budget_min: budgetMin,
-      budget_max: budgetMax,
-    });
-    personaData = await applyBudgetToData(
-      personaData,
-      budgetParsed.min,
-      budgetParsed.max
     );
 
     const { data, error } = await req.supabase
@@ -168,7 +139,10 @@ router.post("/", async (req, res) => {
 
     if (error) {
       console.error("Create persona error:", error);
-      return res.status(400).json({ success: false, message: error.message });
+      return res.status(400).json({
+        success: false,
+        message: error.message,
+      });
     }
 
     res.status(201).json({
@@ -178,7 +152,10 @@ router.post("/", async (req, res) => {
     });
   } catch (error) {
     console.error("Create persona error:", error);
-    res.status(500).json({ success: false, message: "Internal server error" });
+    res.status(500).json({
+      success: false,
+      message: "Internal server error",
+    });
   }
 });
 
@@ -207,54 +184,73 @@ router.get("/:id", async (req, res) => {
   }
 });
 
-// PUT /api/personas/:id - Update persona (aligned with Create a Persona form)
+// PUT /api/personas/:id - Update persona
 router.put("/:id", async (req, res) => {
   try {
     const { id } = req.params;
 
-    const patch = {};
-    // Map simple text fields
-    const textFields = {
-      name: "name",
-      birth_date: "birth_date",
-      birthDate: "birth_date", // Support camelCase from PersonaForm
-      goals: "goals",
-      challenges: "challenges",
-      description: "description",
-      role: "role",
-      interestsInput: "interests_raw",
-      behavioralInsights: "behavioral_insights",
-    };
+    const {
+      name,
+      role,
+      goals,
+      challenges,
+      description,
+      interests,
+      personality_traits,
+      personalityTraits, // camelCase alias
+      budget_min,
+      budget_max,
+      budgetMin, // camelCase alias
+      budgetMax, // camelCase alias
+      behavioral_insights,
+      behavioralInsights, // camelCase alias
+      notes,
+      birth_date,
+      birthDate, // camelCase alias
+      is_active,
+      isActive, // camelCase alias
+      metadata,
+    } = req.body;
 
-    Object.entries(textFields).forEach(([from, to]) => {
-      if (from in req.body) patch[to] = req.body[from] ?? null;
-    });
+    const updateData = {};
 
-    // Age min/max
-    if ("ageMin" in req.body) patch.age_min = toIntOrNull(req.body.ageMin);
-    if ("ageMax" in req.body) patch.age_max = toIntOrNull(req.body.ageMax);
-
-    // Arrays
-    if ("interests" in req.body) patch.interests = toArray(req.body.interests);
-    if ("notes" in req.body && Array.isArray(req.body.notes))
-      patch.notes = req.body.notes;
-
-    // PersonaForm notes handling - map to both description and notes_text
-    if (typeof req.body.notes === "string") {
-      patch.notes_text = req.body.notes;
-      if (!req.body.description) patch.description = req.body.notes; // PersonaForm notes -> description
+    // Only update fields that are provided
+    if (name !== undefined) updateData.name = name;
+    if (role !== undefined) updateData.role = role;
+    if (goals !== undefined) updateData.goals = goals;
+    if (challenges !== undefined) updateData.challenges = challenges;
+    if (description !== undefined) updateData.description = description;
+    if (interests !== undefined) updateData.interests = toArray(interests);
+    if (personality_traits !== undefined || personalityTraits !== undefined) {
+      updateData.personality_traits = toArray(
+        personality_traits || personalityTraits
+      );
     }
-    if (typeof req.body.notes_text === "string")
-      patch.notes_text = req.body.notes_text;
+    if (budget_min !== undefined || budgetMin !== undefined) {
+      updateData.budget_min = toIntOrNull(budget_min || budgetMin);
+    }
+    if (budget_max !== undefined || budgetMax !== undefined) {
+      updateData.budget_max = toIntOrNull(budget_max || budgetMax);
+    }
+    if (behavioral_insights !== undefined || behavioralInsights !== undefined) {
+      updateData.behavioral_insights =
+        behavioral_insights || behavioralInsights;
+    }
+    if (notes !== undefined) updateData.notes = notes;
+    if (birth_date !== undefined || birthDate !== undefined) {
+      updateData.birth_date = birth_date || birthDate;
+    }
+    if (is_active !== undefined || isActive !== undefined) {
+      updateData.is_active = is_active !== undefined ? is_active : isActive;
+    }
+    if (metadata !== undefined) updateData.metadata = metadata;
 
-    // Budget
-    const { min, max } = parseBudgetFromBody(req.body);
-    if (min !== null) patch.budget_min = min;
-    if (max !== null) patch.budget_max = max;
+    // Always update the updated_at timestamp
+    updateData.updated_at = new Date().toISOString();
 
     const { data, error } = await req.supabase
       .from("personas")
-      .update(patch)
+      .update(updateData)
       .eq("id", id)
       .eq("user_id", req.user.id)
       .select("*")
@@ -262,13 +258,17 @@ router.put("/:id", async (req, res) => {
 
     if (error) {
       console.error("Update persona error:", error);
-      return res.status(400).json({ success: false, message: error.message });
+      return res.status(400).json({
+        success: false,
+        message: error.message,
+      });
     }
 
     if (!data) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Persona not found" });
+      return res.status(404).json({
+        success: false,
+        message: "Persona not found",
+      });
     }
 
     res.status(200).json({
@@ -278,7 +278,10 @@ router.put("/:id", async (req, res) => {
     });
   } catch (error) {
     console.error("Update persona error:", error);
-    res.status(500).json({ success: false, message: "Internal server error" });
+    res.status(500).json({
+      success: false,
+      message: "Internal server error",
+    });
   }
 });
 

@@ -17,13 +17,51 @@ if (GEMINI_API_KEY) {
   }
 }
 
-// Backup gift database for fallback scenarios
+// Enhanced gift database with popular culture and age-specific items
 const giftDatabase = {
+  // Popular Culture Characters
+  "küçük prens": [
+    "Küçük Prens özel ciltli koleksiyon",
+    "Küçük Prens figür ve gezegen seti",
+    "Küçük Prens temalı not defteri ve kalem seti",
+    "Küçük Prens yıldız haritası",
+  ],
+  "little prince": [
+    "Little Prince collector's edition",
+    "Little Prince figurine set",
+    "Little Prince themed journal",
+  ],
+  gabby: [
+    "Gabby's Dollhouse oyuncak evi",
+    "Gabby karakterli puzzle seti",
+    "Gabby temalı çanta ve aksesuarlar",
+    "Gabby figür koleksiyonu",
+  ],
+  disney: [
+    "Disney klasikleri özel kutu seti",
+    "Mickey Mouse vintage koleksiyon",
+    "Disney prenses figür seti",
+    "Disney temalı ev dekorasyonu",
+  ],
+  "harry potter": [
+    "Hogwarts kabul mektubu seti",
+    "Harry Potter büyücü asası koleksiyonu",
+    "Marauder's Map replikası",
+    "Hogwarts ev renkleri eşarp seti",
+  ],
+  anime: [
+    "Anime figür koleksiyonu",
+    "Manga çizim seti ve kalemleri",
+    "Cosplay aksesuarları",
+    "Anime poster koleksiyonu",
+  ],
+
   // Reading and books
   kitap: [
     "Bestseller kitap seti",
     "E-kitap okuyucu",
     "Kitap ayracı koleksiyonu",
+    "Kişiye özel kitap damgası",
   ],
   okumak: ["Özel ciltli klasik eser", "Okuma lambası", "Kitap standı"],
   reading: ["Premium bookmark set", "Reading chair cushion", "Book light"],
@@ -222,7 +260,7 @@ function getGiftsFromNotes(notes) {
 }
 
 /**
- * Create a detailed prompt for the AI model
+ * Create a detailed and personalized prompt for the AI model
  */
 function createGiftPrompt(persona) {
   const {
@@ -231,19 +269,17 @@ function createGiftPrompt(persona) {
     birth_date,
     notes,
     description,
-    // New enriched fields
     role,
-    age_min,
-    age_max,
     goals,
     challenges,
-    interests_raw,
     behavioral_insights,
     budget_min,
     budget_max,
+    personality_traits,
     // Aliases from frontend
     preferences,
     behavioralInsights,
+    personalityTraits,
     // Events list injected by API
     events,
   } = persona || {};
@@ -251,22 +287,42 @@ function createGiftPrompt(persona) {
   const age = calculateAge(birth_date);
   const ageCategory = getAgeCategory(age);
 
-  let prompt = `Generate 3 personalized gift recommendations for ${name}.\n\n`;
+  let prompt = `Sen bir hediye uzmanısın. Aşağıdaki kişi için 3 adet çok kişisel ve düşünceli hediye önerisi hazırla.\n\n`;
 
-  // Age details
+  prompt += `🎯 KİŞİ PROFİLİ:\n`;
+  prompt += `İsim: ${name}\n`;
+
+  // Age and life stage analysis
   if (age) {
-    prompt += `Age: ${age} years old (${ageCategory})\n`;
-  } else if (age_min != null || age_max != null) {
-    const rangeText = `${age_min != null ? age_min : "?"}-${
-      age_max != null ? age_max : "?"
-    }`;
-    prompt += `Age range: ${rangeText}\n`;
+    prompt += `Yaş: ${age} yaşında\n`;
+    if (age <= 12) {
+      prompt += `Yaş Grubu: Çocuk - Eğitici, yaratıcı ve eğlenceli hediyeler tercih et\n`;
+    } else if (age <= 17) {
+      prompt += `Yaş Grubu: Genç - Trend, teknoloji ve sosyal aktiviteler odaklı hediyeler\n`;
+    } else if (age <= 30) {
+      prompt += `Yaş Grubu: Genç Yetişkin - Kariyer, hobiler ve yaşam tarzı geliştirici hediyeler\n`;
+    } else if (age <= 50) {
+      prompt += `Yaş Grubu: Yetişkin - Kaliteli, pratik ve kişisel gelişim odaklı hediyeler\n`;
+    } else {
+      prompt += `Yaş Grubu: Olgun - Konfor, nostalji ve deneyim odaklı hediyeler\n`;
+    }
   }
 
-  if (role) prompt += `Role: ${String(role)}\n`;
-  if (goals) prompt += `Goals: ${String(goals)}\n`;
-  if (challenges) prompt += `Challenges: ${String(challenges)}\n`;
+  if (role) {
+    prompt += `Meslek/Rol: ${String(role)}\n`;
+  }
 
+  // Personality traits analysis
+  const allTraits = personality_traits || personalityTraits || [];
+  if (Array.isArray(allTraits) && allTraits.length > 0) {
+    prompt += `\n🧠 KİŞİLİK ÖZELLİKLERİ:\n`;
+    allTraits.forEach((trait) => {
+      prompt += `• ${trait}\n`;
+    });
+    prompt += `Bu kişilik özelliklerine uygun hediyeler seç.\n`;
+  }
+
+  // Interests and hobbies with popular culture detection
   const interestList =
     Array.isArray(interests) && interests.length
       ? interests
@@ -274,26 +330,88 @@ function createGiftPrompt(persona) {
       ? preferences
       : [];
   if (interestList.length > 0) {
-    prompt += `Interests: ${interestList.join(", ")}\n`;
-  }
-  if (interests_raw) {
-    prompt += `Interests (free text): ${String(interests_raw)}\n`;
+    prompt += `\n🎨 İLGİ ALANLARI VE HOBİLER:\n`;
+    interestList.forEach((interest) => {
+      prompt += `• ${interest}\n`;
+
+      // Check for popular culture references
+      const lowerInterest = interest.toLowerCase();
+      if (
+        lowerInterest.includes("küçük prens") ||
+        lowerInterest.includes("little prince")
+      ) {
+        prompt += `  ⭐ ÖZEL NOT: Küçük Prens sevgisi - Bu karakterle ilgili özel koleksiyon ürünleri, kitap serileri, figürler veya temalı hediyeler tercih et!\n`;
+      }
+      if (
+        lowerInterest.includes("gabby") ||
+        lowerInterest.includes("gabby's dollhouse")
+      ) {
+        prompt += `  ⭐ ÖZEL NOT: Gabby's Dollhouse sevgisi - Bu karakterle ilgili oyuncaklar, figürler, puzzle veya temalı hediyeler tercih et!\n`;
+      }
+      if (
+        lowerInterest.includes("disney") ||
+        lowerInterest.includes("mickey") ||
+        lowerInterest.includes("minnie")
+      ) {
+        prompt += `  ⭐ ÖZEL NOT: Disney sevgisi - Disney karakterli özel koleksiyon ürünleri, vintage posterler veya temalı hediyeler tercih et!\n`;
+      }
+      if (
+        lowerInterest.includes("harry potter") ||
+        lowerInterest.includes("hogwarts")
+      ) {
+        prompt += `  ⭐ ÖZEL NOT: Harry Potter sevgisi - Hogwarts temalı ürünler, büyücülük aksesuarları veya koleksiyon ürünleri tercih et!\n`;
+      }
+      if (lowerInterest.includes("anime") || lowerInterest.includes("manga")) {
+        prompt += `  ⭐ ÖZEL NOT: Anime/Manga sevgisi - Figürler, manga serileri, cosplay aksesuarları veya anime temalı hediyeler tercih et!\n`;
+      }
+    });
   }
 
+  // Goals and aspirations
+  if (goals) {
+    prompt += `\n🎯 HEDEFLER VE AMAÇLAR:\n${String(goals)}\n`;
+    prompt += `Bu hedefleri destekleyecek hediyeler düşün.\n`;
+  }
+
+  // Challenges and pain points
+  if (challenges) {
+    prompt += `\n⚡ ZORLUKLAR VE İHTİYAÇLAR:\n${String(challenges)}\n`;
+    prompt += `Bu zorlukları çözmeye yardımcı olacak hediyeler öner.\n`;
+  }
+
+  // Personal description and notes
   if (description) {
-    prompt += `Description: ${String(description)}\n`;
-  }
-  if (notes && Array.isArray(notes) && notes.length > 0) {
-    prompt += `Additional notes: ${notes.join(", ")}\n`;
+    prompt += `\n📝 KİŞİSEL AÇIKLAMA:\n${String(description)}\n`;
   }
 
+  if (notes) {
+    const notesText =
+      typeof notes === "string"
+        ? notes
+        : Array.isArray(notes)
+        ? notes.join(", ")
+        : String(notes);
+    prompt += `\n💭 EK NOTLAR:\n${notesText}\n`;
+  }
+
+  // Behavioral insights
   const insights = behavioral_insights ?? behavioralInsights;
   if (insights) {
-    prompt += `Behavioral insights: ${String(insights)}\n`;
+    prompt += `\n🔍 DAVRANIŞSAL ANALİZ:\n${String(insights)}\n`;
+    prompt += `Bu davranış kalıplarına uygun hediyeler seç.\n`;
   }
 
-  // Recent events (up to 5)
+  // Budget considerations
+  if (budget_min != null || budget_max != null) {
+    const budgetText = `${budget_min != null ? budget_min : "0"} - ${
+      budget_max != null ? budget_max : "∞"
+    } TL`;
+    prompt += `\n💰 BÜTÇE ARALIĞI: ${budgetText}\n`;
+  }
+
+  // Recent events context
   if (Array.isArray(events) && events.length) {
+    prompt += `\n📅 SON YAŞAM OLAYLARI:\n`;
     const recent = events
       .slice(0, 5)
       .map((e) => {
@@ -302,27 +420,26 @@ function createGiftPrompt(persona) {
           : "";
         const t = e.title || e.event_type || "";
         const desc = e.description || "";
-        return `- ${t}${d ? ` (${d})` : ""}${desc ? `: ${desc}` : ""}`;
+        return `• ${t}${d ? ` (${d})` : ""}${desc ? `: ${desc}` : ""}`;
       })
       .join("\n");
-    prompt += `Recent life events that may influence preferences:\n${recent}\n`;
+    prompt += `${recent}\n`;
+    prompt += `Bu olayları göz önünde bulundurarak hediye seç.\n`;
   }
 
-  if (budget_min != null || budget_max != null) {
-    const budgetText = `${budget_min != null ? budget_min : "0"} - ${
-      budget_max != null ? budget_max : "∞"
-    }`;
-    prompt += `Budget range: ${budgetText}\n`;
-  }
+  prompt += `\n🎁 HEDİYE ÖNERİLERİ İÇİN TALİMATLAR:\n`;
+  prompt += `• Her hediye önerisini kişinin yaşına, kişilik özelliklerine, ilgi alanlarına ve hedeflerine göre özelleştir\n`;
+  prompt += `• Popüler kültür referansları varsa (Küçük Prens, Gabby, Disney vb.) mutlaka bunları kullan\n`;
+  prompt += `• Bütçe aralığına uygun hediyeler öner\n`;
+  prompt += `• Her hediye için neden bu kişiye uygun olduğunu detaylı açıkla\n`;
+  prompt += `• Genel hediyeler yerine çok spesifik ve kişisel hediyeler tercih et\n`;
+  prompt += `• Yaş grubuna uygun hediyeler seç (çocuk için oyuncak, yetişkin için kaliteli ürünler)\n`;
+  prompt += `• Kişinin davranışsal özelliklerini ve zorluklarını çözecek hediyeler düşün\n\n`;
 
-  prompt += `\nInstructions:\n`;
-  prompt += `- Provide 3 specific, thoughtful gift ideas tailored to the information above.\n`;
-  prompt += `- Keep suggestions within the budget range if provided.\n`;
-  prompt += `- Prefer gifts aligned with interests, role, goals, challenges, description, behavioral insights, and recent events.\n`;
-  prompt += `- Briefly explain why each gift matches.\n`;
-  prompt += `- Avoid generic items unless strongly justified.\n`;
-  prompt += `\nOutput format:\n`;
-  prompt += `1. [Gift Name] - [Why it fits]\n2. [Gift Name] - [Why it fits]\n3. [Gift Name] - [Why it fits]\n`;
+  prompt += `ÇIKTI FORMATI:\n`;
+  prompt += `1. [Hediye Adı] - [Bu hediyenin neden bu kişiye mükemmel uyduğunun detaylı açıklaması]\n`;
+  prompt += `2. [Hediye Adı] - [Bu hediyenin neden bu kişiye mükemmel uyduğunun detaylı açıklaması]\n`;
+  prompt += `3. [Hediye Adı] - [Bu hediyenin neden bu kişiye mükemmel uyduğunun detaylı açıklaması]\n`;
 
   return prompt;
 }
@@ -365,43 +482,136 @@ function parseAIResponse(response, persona) {
 }
 
 /**
- * Fallback function using the original mock logic
+ * Enhanced fallback function with popular culture and personality awareness
  */
 function generateFallbackGifts(persona) {
-  const { interests, birth_date, notes, description } = persona;
+  const {
+    interests,
+    birth_date,
+    notes,
+    description,
+    personality_traits,
+    personalityTraits,
+  } = persona;
+  const age = calculateAge(birth_date);
+  const ageCategory = getAgeCategory(age);
 
   let giftIdeas = [];
+  let popularCultureGifts = [];
 
-  // Interests-based
+  // Check for popular culture references in interests
+  const allInterests = Array.isArray(interests) ? interests : [];
+  allInterests.forEach((interest) => {
+    const lowerInterest = interest.toLowerCase();
+
+    if (
+      lowerInterest.includes("küçük prens") ||
+      lowerInterest.includes("little prince")
+    ) {
+      popularCultureGifts.push(
+        "Küçük Prens özel ciltli kitap seti",
+        "Küçük Prens figür koleksiyonu",
+        "Küçük Prens temalı not defteri"
+      );
+    }
+    if (lowerInterest.includes("gabby")) {
+      popularCultureGifts.push(
+        "Gabby's Dollhouse oyuncak seti",
+        "Gabby karakterli puzzle",
+        "Gabby temalı çanta"
+      );
+    }
+    if (lowerInterest.includes("disney")) {
+      popularCultureGifts.push(
+        "Disney klasikleri koleksiyon kutusu",
+        "Mickey Mouse vintage poster",
+        "Disney prenses figür seti"
+      );
+    }
+    if (lowerInterest.includes("harry potter")) {
+      popularCultureGifts.push(
+        "Hogwarts mektup seti",
+        "Harry Potter büyücü asası",
+        "Marauder's Map replikası"
+      );
+    }
+    if (lowerInterest.includes("anime") || lowerInterest.includes("manga")) {
+      popularCultureGifts.push(
+        "Anime figür koleksiyonu",
+        "Manga çizim seti",
+        "Cosplay aksesuarları"
+      );
+    }
+  });
+
+  // Add popular culture gifts first (they're most personal)
+  giftIdeas.push(...popularCultureGifts);
+
+  // Personality-based gifts
+  const allTraits = personality_traits || personalityTraits || [];
+  if (Array.isArray(allTraits)) {
+    allTraits.forEach((trait) => {
+      const lowerTrait = trait.toLowerCase();
+
+      if (lowerTrait.includes("yaratıcı") || lowerTrait.includes("sanat")) {
+        giftIdeas.push(
+          "Profesyonel sanat malzemeleri seti",
+          "Yaratıcılık atölyesi kursu"
+        );
+      }
+      if (lowerTrait.includes("kitap") || lowerTrait.includes("okuma")) {
+        giftIdeas.push("Özel ciltli klasik eser koleksiyonu", "Okuma lambası");
+      }
+      if (lowerTrait.includes("teknoloji")) {
+        giftIdeas.push("Akıllı ev cihazı", "Teknoloji aksesuarları");
+      }
+      if (lowerTrait.includes("spor") || lowerTrait.includes("aktif")) {
+        giftIdeas.push("Fitness tracker", "Spor ekipmanları seti");
+      }
+      if (lowerTrait.includes("müzik")) {
+        giftIdeas.push("Kaliteli kulaklık", "Müzik enstrümanı aksesuarları");
+      }
+    });
+  }
+
+  // Age-appropriate gifts
+  const ageGifts = ageBasedGifts[ageCategory] || ageBasedGifts.adult;
+  giftIdeas.push(...ageGifts);
+
+  // Interest-based gifts
   const interestGifts = getGiftsFromInterests(interests);
   giftIdeas.push(...interestGifts);
 
-  // Notes + description based
+  // Notes and description based
   const combinedNotes = Array.isArray(notes) ? [...notes] : [];
   if (description) combinedNotes.push(String(description));
   const noteGifts = getGiftsFromNotes(combinedNotes);
   giftIdeas.push(...noteGifts);
 
-  // Age-based
-  const age = calculateAge(birth_date);
-  const ageCategory = getAgeCategory(age);
-  const ageGifts = ageBasedGifts[ageCategory] || ageBasedGifts.adult;
-  giftIdeas.push(...ageGifts);
-
-  // Dedup & fill
+  // Remove duplicates and prioritize popular culture gifts
   giftIdeas = [...new Set(giftIdeas)];
-  if (giftIdeas.length < 3) {
-    const remaining = 3 - giftIdeas.length;
+
+  // Ensure popular culture gifts are prioritized
+  const prioritizedGifts = [
+    ...popularCultureGifts,
+    ...giftIdeas.filter((gift) => !popularCultureGifts.includes(gift)),
+  ];
+
+  // Fill with generic gifts if needed
+  if (prioritizedGifts.length < 3) {
+    const remaining = 3 - prioritizedGifts.length;
     const shuffledGeneric = [...genericGifts].sort(() => Math.random() - 0.5);
-    giftIdeas.push(...shuffledGeneric.slice(0, remaining));
+    prioritizedGifts.push(...shuffledGeneric.slice(0, remaining));
   }
 
-  const selected = [...giftIdeas].sort(() => Math.random() - 0.5).slice(0, 3);
+  const selected = prioritizedGifts.slice(0, 3);
   return selected.map((gift, index) => ({
     id: index + 1,
     title: gift,
-    reason: generateReason(gift, persona),
-    confidence: Math.floor(Math.random() * 30) + 70,
+    reason: generateEnhancedReason(gift, persona),
+    confidence: popularCultureGifts.includes(gift)
+      ? Math.floor(Math.random() * 10) + 90 // 90-100% for popular culture matches
+      : Math.floor(Math.random() * 30) + 70, // 70-100% for others
   }));
 }
 
@@ -466,52 +676,171 @@ async function generateGiftIdeas(persona) {
 }
 
 /**
- * Generate reasoning for gift recommendation
+ * Generate enhanced reasoning for gift recommendation
  */
-function generateReason(gift, persona) {
-  const { name, interests, notes, description } = persona;
+function generateEnhancedReason(gift, persona) {
+  const {
+    name,
+    interests,
+    notes,
+    description,
+    personality_traits,
+    personalityTraits,
+    role,
+    goals,
+    challenges,
+  } = persona;
+  const age = calculateAge(persona.birth_date);
+  const giftLower = gift.toLowerCase();
 
-  const reasonTemplates = [
-    `${name} için ilgi alanlarına uygun seçim`,
-    `Kişisel notlarına dayanarak önerilen hediye`,
-    `${name}'in zevklerine göre seçilmiş özel hediye`,
-    `İlgi alanları göz önünde bulundurularak önerilen`,
-    `Kişisel özelliklerine uygun düşünülmüş hediye`,
-  ];
+  // Popular culture specific reasons
+  if (
+    giftLower.includes("küçük prens") ||
+    giftLower.includes("little prince")
+  ) {
+    return `${name}'in Küçük Prens sevgisine özel olarak seçilmiş, bu eşsiz hikayenin büyüsünü yaşatacak hediye`;
+  }
+  if (giftLower.includes("gabby")) {
+    return `Gabby's Dollhouse tutkusuna uygun, yaratıcılığını ve hayal gücünü destekleyecek özel hediye`;
+  }
+  if (
+    giftLower.includes("disney") ||
+    giftLower.includes("mickey") ||
+    giftLower.includes("minnie")
+  ) {
+    return `Disney sevgisini yansıtan, çocukluk anılarını canlandıracak nostaljik ve özel hediye`;
+  }
+  if (giftLower.includes("harry potter") || giftLower.includes("hogwarts")) {
+    return `Harry Potter dünyasına olan tutkusunu besleyecek, büyücülük hissini yaşatacak koleksiyon hediyesi`;
+  }
+  if (giftLower.includes("anime") || giftLower.includes("manga")) {
+    return `Anime/manga sevgisine uygun, Japon kültürüne olan ilgisini destekleyecek özel hediye`;
+  }
 
-  // Match interests
-  if (interests && Array.isArray(interests)) {
-    for (const interest of interests) {
+  // Age-specific reasoning
+  if (age) {
+    if (
+      age <= 12 &&
+      (giftLower.includes("oyuncak") || giftLower.includes("eğitici"))
+    ) {
+      return `${age} yaşındaki ${name} için yaş grubuna uygun, öğrenmeyi eğlenceli hale getirecek hediye`;
+    }
+    if (
+      age >= 13 &&
+      age <= 17 &&
+      (giftLower.includes("teknoloji") || giftLower.includes("trend"))
+    ) {
+      return `Genç yaşta olan ${name}'in teknoloji ilgisine ve trend takibine uygun modern hediye`;
+    }
+    if (
+      age >= 18 &&
+      age <= 30 &&
+      (giftLower.includes("kariyer") || giftLower.includes("gelişim"))
+    ) {
+      return `Genç yetişkin ${name}'in kariyer hedeflerini destekleyecek, kişisel gelişimine katkı sağlayacak hediye`;
+    }
+  }
+
+  // Personality traits matching
+  const allTraits = personality_traits || personalityTraits || [];
+  if (Array.isArray(allTraits)) {
+    for (const trait of allTraits) {
+      const traitLower = trait.toLowerCase();
       if (
-        gift.toLowerCase().includes(interest.toLowerCase()) ||
-        interest.toLowerCase().includes(gift.toLowerCase().split(" ")[0])
+        traitLower.includes("yaratıcı") &&
+        (giftLower.includes("sanat") || giftLower.includes("yaratıc"))
       ) {
-        return `${interest} ilgisine uygun özel seçim`;
+        return `${name}'in yaratıcı kişiliğine mükemmel uyum sağlayan, sanatsal yeteneklerini geliştirecek hediye`;
+      }
+      if (traitLower.includes("kitap") && giftLower.includes("kitap")) {
+        return `Kitap seven kişiliğine uygun, okuma keyfini artıracak özenle seçilmiş hediye`;
+      }
+      if (traitLower.includes("teknoloji") && giftLower.includes("teknoloji")) {
+        return `Teknoloji meraklısı kişiliğine uygun, günlük yaşamını kolaylaştıracak yenilikçi hediye`;
+      }
+      if (
+        traitLower.includes("spor") &&
+        (giftLower.includes("spor") || giftLower.includes("fitness"))
+      ) {
+        return `Aktif ve spor seven kişiliğine uygun, sağlıklı yaşam tarzını destekleyecek hediye`;
       }
     }
   }
 
-  // Match description keywords
-  if (description) {
-    const desc = String(description).toLowerCase();
-    const g = gift.toLowerCase();
-    if (desc.includes("yoga") || g.includes("yoga"))
-      return "Açıklamasındaki yoga ilgisine uygun seçim";
-    if (desc.includes("müzik") || g.includes("müzik") || g.includes("music"))
-      return "Müzik zevkine hitap eden bir tercih";
-    if (
-      desc.includes("bahçe") ||
-      desc.includes("bahçıvanlık") ||
-      g.includes("bahçe")
-    )
-      return "Bahçe ilgisine uygun düşünülmüş hediye";
-    if (desc.includes("kitap") || desc.includes("okuma") || g.includes("kitap"))
-      return "Okuma sevgisine uygun bir hediye";
-    if (desc.includes("kahve") || g.includes("kahve") || g.includes("coffee"))
-      return "Kahve keyfine uygun seçim";
+  // Role-based reasoning
+  if (role) {
+    const roleLower = String(role).toLowerCase();
+    if (roleLower.includes("öğretmen") && giftLower.includes("eğitim")) {
+      return `Öğretmen olan ${name}'in mesleğini destekleyecek, eğitim kalitesini artıracak hediye`;
+    }
+    if (roleLower.includes("doktor") && giftLower.includes("sağlık")) {
+      return `Sağlık alanında çalışan ${name}'in meslek hayatına katkı sağlayacak hediye`;
+    }
+    if (roleLower.includes("mühendis") && giftLower.includes("teknoloji")) {
+      return `Mühendis olan ${name}'in teknik ilgisine uygun, profesyonel gelişimini destekleyecek hediye`;
+    }
   }
 
-  return reasonTemplates[Math.floor(Math.random() * reasonTemplates.length)];
+  // Goals-based reasoning
+  if (goals && giftLower.includes("gelişim")) {
+    return `${name}'in "${goals}" hedefine ulaşmasına destek olacak, kişisel gelişimini hızlandıracak hediye`;
+  }
+
+  // Interest matching with enhanced descriptions
+  if (interests && Array.isArray(interests)) {
+    for (const interest of interests) {
+      const interestLower = interest.toLowerCase();
+      if (
+        giftLower.includes(interestLower) ||
+        interestLower.includes(giftLower.split(" ")[0])
+      ) {
+        return `${name}'in ${interest} tutkusuna özel olarak seçilmiş, bu ilgi alanındaki deneyimini zenginleştirecek hediye`;
+      }
+    }
+  }
+
+  // Description and notes matching
+  const allText = [description, ...(Array.isArray(notes) ? notes : [notes])]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+  if (allText) {
+    if (allText.includes("yoga") && giftLower.includes("yoga")) {
+      return `Yoga pratiğine olan bağlılığını destekleyecek, iç huzurunu artıracak özel hediye`;
+    }
+    if (
+      allText.includes("müzik") &&
+      (giftLower.includes("müzik") || giftLower.includes("music"))
+    ) {
+      return `Müzik tutkusunu besleyecek, melodi dünyasındaki yolculuğunu zenginleştirecek hediye`;
+    }
+    if (allText.includes("bahçe") && giftLower.includes("bahçe")) {
+      return `Bahçıvanlık sevgisine uygun, doğayla bağını güçlendirecek yeşil hediye`;
+    }
+    if (allText.includes("kahve") && giftLower.includes("kahve")) {
+      return `Kahve ritüellerini önemseyen ${name} için, bu özel anları daha keyifli hale getirecek hediye`;
+    }
+  }
+
+  // Default enhanced reasons
+  const enhancedTemplates = [
+    `${name}'in benzersiz kişiliğine özel olarak düşünülmüş, yaşam kalitesini artıracak hediye`,
+    `Kişisel özelliklerine mükemmel uyum sağlayan, günlük yaşamına değer katacak özenli seçim`,
+    `${name}'in ilgi alanlarını destekleyecek, yeni deneyimler yaşamasını sağlayacak hediye`,
+    `Kişisel zevklerine hitap eden, uzun süre kullanacağı kaliteli ve düşünceli hediye`,
+    `${name}'in yaşam tarzına uygun, hem pratik hem de anlamlı olan özel hediye`,
+  ];
+
+  return enhancedTemplates[
+    Math.floor(Math.random() * enhancedTemplates.length)
+  ];
+}
+
+/**
+ * Generate reasoning for gift recommendation (legacy function)
+ */
+function generateReason(gift, persona) {
+  return generateEnhancedReason(gift, persona);
 }
 
 /**

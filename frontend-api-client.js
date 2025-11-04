@@ -47,26 +47,27 @@ async function apiRequest(endpoint, options = {}) {
 
 // PersonaForm API functions
 export const personaAPI = {
-  // Create persona from PersonaForm data (supports ALL fields)
+  // Create persona from PersonaForm data (matches exact Supabase table structure)
   async create(formData) {
     const payload = {
-      // Temel alanlar
+      // Required fields
       name: formData.name,
-      birthDate: formData.birthDate,
-      interests: formData.interests || [],
-      notes: formData.notes || "",
-      description: formData.description || formData.notes || "",
 
-      // Ek alanlar (varsa gönder)
+      // Optional fields matching table structure
       role: formData.role || null,
-      ageMin: formData.ageMin || null,
-      ageMax: formData.ageMax || null,
       goals: formData.goals || null,
       challenges: formData.challenges || null,
-      interestsInput: formData.interestsInput || null,
-      behavioralInsights: formData.behavioralInsights || null,
-      budgetMin: formData.budgetMin || null,
-      budgetMax: formData.budgetMax || null,
+      description: formData.description || formData.notes || null,
+      interests: formData.interests || [],
+      personality_traits:
+        formData.personalityTraits || formData.personality_traits || [],
+      budget_min: formData.budgetMin || formData.budget_min || null,
+      budget_max: formData.budgetMax || formData.budget_max || null,
+      behavioral_insights:
+        formData.behavioralInsights || formData.behavioral_insights || null,
+      notes: formData.notes || null,
+      birth_date: formData.birthDate || formData.birth_date || null,
+      metadata: formData.metadata || {},
     };
 
     return apiRequest("/api/personas", {
@@ -75,26 +76,58 @@ export const personaAPI = {
     });
   },
 
-  // Update persona from PersonaForm data (supports ALL fields)
+  // Update persona from PersonaForm data (matches exact Supabase table structure)
   async update(personaId, formData) {
     const payload = {
-      // Temel alanlar
-      name: formData.name,
-      birthDate: formData.birthDate,
-      interests: formData.interests || [],
-      notes: formData.notes || "",
-      description: formData.description || formData.notes || "",
-
-      // Ek alanlar (varsa gönder)
-      role: formData.role || null,
-      ageMin: formData.ageMin || null,
-      ageMax: formData.ageMax || null,
-      goals: formData.goals || null,
-      challenges: formData.challenges || null,
-      interestsInput: formData.interestsInput || null,
-      behavioralInsights: formData.behavioralInsights || null,
-      budgetMin: formData.budgetMin || null,
-      budgetMax: formData.budgetMax || null,
+      // Only include fields that are provided
+      ...(formData.name !== undefined && { name: formData.name }),
+      ...(formData.role !== undefined && { role: formData.role }),
+      ...(formData.goals !== undefined && { goals: formData.goals }),
+      ...(formData.challenges !== undefined && {
+        challenges: formData.challenges,
+      }),
+      ...(formData.description !== undefined && {
+        description: formData.description,
+      }),
+      ...(formData.interests !== undefined && {
+        interests: formData.interests,
+      }),
+      ...(formData.personalityTraits !== undefined && {
+        personality_traits: formData.personalityTraits,
+      }),
+      ...(formData.personality_traits !== undefined && {
+        personality_traits: formData.personality_traits,
+      }),
+      ...(formData.budgetMin !== undefined && {
+        budget_min: formData.budgetMin,
+      }),
+      ...(formData.budget_min !== undefined && {
+        budget_min: formData.budget_min,
+      }),
+      ...(formData.budgetMax !== undefined && {
+        budget_max: formData.budgetMax,
+      }),
+      ...(formData.budget_max !== undefined && {
+        budget_max: formData.budget_max,
+      }),
+      ...(formData.behavioralInsights !== undefined && {
+        behavioral_insights: formData.behavioralInsights,
+      }),
+      ...(formData.behavioral_insights !== undefined && {
+        behavioral_insights: formData.behavioral_insights,
+      }),
+      ...(formData.notes !== undefined && { notes: formData.notes }),
+      ...(formData.birthDate !== undefined && {
+        birth_date: formData.birthDate,
+      }),
+      ...(formData.birth_date !== undefined && {
+        birth_date: formData.birth_date,
+      }),
+      ...(formData.isActive !== undefined && { is_active: formData.isActive }),
+      ...(formData.is_active !== undefined && {
+        is_active: formData.is_active,
+      }),
+      ...(formData.metadata !== undefined && { metadata: formData.metadata }),
     };
 
     return apiRequest(`/api/personas/${personaId}`, {

@@ -73,6 +73,9 @@ router.get("/", async (req, res) => {
 // POST /api/personas - Create new persona (aligned with PersonaForm)
 router.post("/", async (req, res) => {
   try {
+    // Debug: Log incoming request body
+    console.log("📥 Incoming request body:", JSON.stringify(req.body, null, 2));
+
     const {
       name,
       birth_date,
@@ -92,6 +95,24 @@ router.post("/", async (req, res) => {
       budgetMax,
     } = req.body || {};
 
+    // Debug: Log extracted values
+    console.log("🔍 Extracted values:", {
+      name,
+      birthDate,
+      interests,
+      notes,
+      description,
+      role,
+      ageMin,
+      ageMax,
+      goals,
+      challenges,
+      interestsInput,
+      behavioralInsights,
+      budgetMin,
+      budgetMax,
+    });
+
     if (!name) {
       return res
         .status(400)
@@ -108,14 +129,14 @@ router.post("/", async (req, res) => {
       // PersonaForm notes -> description mapping
       description: description || (typeof notes === "string" ? notes : null),
       notes_text: typeof notes === "string" ? notes : null,
-      // Additional fields
-      role: role ?? null,
+      // Additional fields - PersonaForm'dan gelmeyebilir, o yüzden null bırak
+      role: role || null,
       age_min: toIntOrNull(ageMin),
       age_max: toIntOrNull(ageMax),
-      goals: goals ?? null,
-      challenges: challenges ?? null,
-      interests_raw: interestsInput ?? null,
-      behavioral_insights: behavioralInsights ?? null,
+      goals: goals || null,
+      challenges: challenges || null,
+      interests_raw: interestsInput || null,
+      behavioral_insights: behavioralInsights || null,
     };
 
     // Budget: support budgetMin/budgetMax in addition to existing shapes

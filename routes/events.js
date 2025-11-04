@@ -18,9 +18,8 @@ router.get("/:personaId", async (req, res) => {
   try {
     const { personaId } = req.params;
 
-    // First verify persona ownership
+    // First verify persona ownership (using public schema now)
     const { data: persona, error: personaError } = await req.supabase
-      .schema("private")
       .from("personas")
       .select("id")
       .eq("id", personaId)
@@ -34,27 +33,17 @@ router.get("/:personaId", async (req, res) => {
       });
     }
 
-    // Get events for this persona
-    const { data, error } = await req.supabase
-      .schema("private")
-      .from("persona_events")
-      .select("*")
-      .eq("persona_id", personaId)
-      .eq("user_id", req.user.id)
-      .order("occurred_at", { ascending: false, nullsFirst: false })
-      .order("created_at", { ascending: false });
-
-    if (error) {
-      console.error("Get events error:", error);
-      return res.status(400).json({
-        success: false,
-        message: error.message,
-      });
-    }
+    // TODO: Events table needs to be migrated to public schema
+    // For now, return empty array to prevent frontend errors
+    console.log(
+      `📝 Events requested for persona ${personaId} - returning empty array (table not migrated yet)`
+    );
 
     res.status(200).json({
       success: true,
-      data: data || [],
+      data: [], // Empty array until events table is migrated
+      message:
+        "Events feature temporarily unavailable - table migration pending",
     });
   } catch (error) {
     console.error("Get events error:", error);

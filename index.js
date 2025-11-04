@@ -12,7 +12,7 @@ const personasRoutes = require("./routes/personas");
 const personaRoutes = require("./routes/persona");
 const giftRoutes = require("./routes/gift");
 // const milestonesRoutes = require("./routes/milestones"); // Removed - file deleted
-const eventsRoutes = require("./routes/events");
+const eventsRoutes = require("./routes/events-temp"); // Temporary events with empty responses
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -83,7 +83,7 @@ app.use("/api/personas", verifyAuth, personasRoutes);
 app.use("/api/persona", verifyAuth, personaRoutes);
 app.use("/api/gift", verifyAuth, giftRoutes);
 // app.use("/api", verifyAuth, milestonesRoutes); // Removed - file deleted
-// app.use("/api/events", verifyAuth, eventsRoutes); // Temporarily disabled - need public.persona_events table
+app.use("/api/events", verifyAuth, eventsRoutes); // Re-enabled for frontend compatibility
 
 // Basic route for testing (must be before 404 handler)
 app.get("/", (req, res) => {

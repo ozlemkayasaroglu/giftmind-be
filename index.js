@@ -13,6 +13,7 @@ const personaRoutes = require("./routes/persona");
 const giftRoutes = require("./routes/gift");
 // const milestonesRoutes = require("./routes/milestones"); // Removed - file deleted
 const eventsRoutes = require("./routes/events-temp"); // Temporary events with empty responses
+const avatarSimpleRoutes = require("./routes/avatar-simple"); // Simple avatar system
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -83,6 +84,8 @@ app.use("/api/personas", verifyAuth, personasRoutes);
 app.use("/api/persona", verifyAuth, personaRoutes);
 // Events nested under personas (frontend expects /api/personas/{id}/events)
 app.use("/api/personas", verifyAuth, eventsRoutes);
+// Simple avatar system nested under personas
+app.use("/api/personas", verifyAuth, avatarSimpleRoutes);
 app.use("/api/gift", verifyAuth, giftRoutes);
 // app.use("/api", verifyAuth, milestonesRoutes); // Removed - file deleted
 // app.use("/api/events", verifyAuth, eventsRoutes); // Moved to nested route under personas

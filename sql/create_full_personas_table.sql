@@ -1,42 +1,47 @@
--- Update personas table to support ALL PersonaForm fields
+-- Create complete personas table with ALL fields
 -- Run this SQL in Supabase Dashboard > SQL Editor
 
--- Add ALL missing columns to private.personas table (change to public if needed)
-ALTER TABLE private.personas 
-ADD COLUMN IF NOT EXISTS user_id uuid REFERENCES auth.users(id) ON DELETE CASCADE,
-ADD COLUMN IF NOT EXISTS name text NOT NULL,
-ADD COLUMN IF NOT EXISTS birth_date date,
-ADD COLUMN IF NOT EXISTS interests text[] DEFAULT '{}',
-ADD COLUMN IF NOT EXISTS notes text[] DEFAULT '{}',
-ADD COLUMN IF NOT EXISTS description text,
-ADD COLUMN IF NOT EXISTS notes_text text,
-ADD COLUMN IF NOT EXISTS role text,
-ADD COLUMN IF NOT EXISTS age_min integer,
-ADD COLUMN IF NOT EXISTS age_max integer,
-ADD COLUMN IF NOT EXISTS goals text,
-ADD COLUMN IF NOT EXISTS challenges text,
-ADD COLUMN IF NOT EXISTS interests_raw text,
-ADD COLUMN IF NOT EXISTS behavioral_insights text,
-ADD COLUMN IF NOT EXISTS budget_min integer,
-ADD COLUMN IF NOT EXISTS budget_max integer,
-ADD COLUMN IF NOT EXISTS avatar_url text,
-ADD COLUMN IF NOT EXISTS created_at timestamptz DEFAULT timezone('utc'::text, now()) NOT NULL,
-ADD COLUMN IF NOT EXISTS updated_at timestamptz DEFAULT timezone('utc'::text, now()) NOT NULL;
+-- Create personas table in public schema with ALL PersonaForm fields
+CREATE TABLE IF NOT EXISTS public.personas (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  name text NOT NULL,
+  birth_date date,
+  interests text[] DEFAULT '{}',
+  notes text[] DEFAULT '{}',
+  description text,
+  notes_text text,
+  role text,
+  age_min integer,
+  age_max integer,
+  goals text,
+  challenges text,
+  interests_raw text,
+  behavioral_insights text,
+  budget_min integer,
+  budget_max integer,
+  avatar_url text,
+  is_active boolean DEFAULT true,
+  metadata jsonb DEFAULT '{}'::jsonb,
+  created_at timestamptz DEFAULT timezone('utc'::text, now()) NOT NULL,
+  updated_at timestamptz DEFAULT timezone('utc'::text, now()) NOT NULL
+);
 
 -- Create indexes for better performance
 CREATE INDEX IF NOT EXISTS idx_personas_user_id ON public.personas(user_id);
 CREATE INDEX IF NOT EXISTS idx_personas_created_at ON public.personas(created_at);
+CREATE INDEX IF NOT EXISTS idx_personas_is_active ON public.personas(is_active);
 
--- Enable Row Level Security (RLS) if not already enabled
+-- Enable Row Level Security (RLS)
 ALTER TABLE public.personas ENABLE ROW LEVEL SECURITY;
 
--- Create RLS policies for public.personas (if not exist)
+-- Create RLS policies
 DO $$ 
 BEGIN
     -- Users can only see their own personas
     IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'personas' AND policyname = 'personas_select_own') THEN
         CREATE POLICY personas_select_own ON public.personas
-        FOR SELECT USING (auth.uid() = user_id);
+        FOR SELECT USING (auth.uid() = user_id AND is_active = true);
     END IF;
 
     -- Users can insert their own personas  
@@ -58,7 +63,7 @@ BEGIN
     END IF;
 END $$;
 
--- Create updated_at trigger function if not exists
+-- Create updated_at trigger function
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$
 BEGIN

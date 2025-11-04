@@ -223,6 +223,56 @@ export const api = {
       };
     },
   },
+
+  // Avatar API
+  avatar: {
+    async upload(personaId, file) {
+      const formData = new FormData();
+      formData.append("avatar", file);
+
+      const token = getAuthToken();
+      const response = await fetch(
+        `${API_BASE_URL}/api/personas/${personaId}/avatar-simple`,
+        {
+          method: "POST",
+          headers: {
+            ...(token && { Authorization: `Bearer ${token}` }),
+          },
+          body: formData,
+        }
+      );
+
+      const data = await response.json();
+      return {
+        success: response.ok,
+        data: response.ok ? data : null,
+        error: response.ok ? null : data,
+      };
+    },
+
+    async get(personaId) {
+      const result = await apiRequest(
+        `/api/personas/${personaId}/avatar-simple`
+      );
+      return {
+        data: result.success ? result.data?.avatar_url : null,
+        error: result.error,
+      };
+    },
+
+    async remove(personaId) {
+      const result = await apiRequest(
+        `/api/personas/${personaId}/avatar-simple`,
+        {
+          method: "DELETE",
+        }
+      );
+      return {
+        data: result.success,
+        error: result.error,
+      };
+    },
+  },
 };
 
 // React hook for PersonaForm submission
@@ -258,12 +308,60 @@ export function usePersonaSubmit() {
   return { submitPersona, loading, error };
 }
 
+// React hook for Avatar operations
+export function useAvatar() {
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const uploadAvatar = async (personaId, file) => {
+    setUploading(true);
+    setError(null);
+
+    try {
+      const result = await api.avatar.upload(personaId, file);
+      if (result.success) {
+        return result.data;
+      } else {
+        throw new Error(result.error?.message || "Avatar upload failed");
+      }
+    } catch (err) {
+      setError(err.message);
+      throw err;
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const getAvatar = async (personaId) => {
+    try {
+      const result = await api.avatar.get(personaId);
+      return result.data;
+    } catch (err) {
+      setError(err.message);
+      return null;
+    }
+  };
+
+  const removeAvatar = async (personaId) => {
+    try {
+      const result = await api.avatar.remove(personaId);
+      return result.data;
+    } catch (err) {
+      setError(err.message);
+      throw err;
+    }
+  };
+
+  return { uploadAvatar, getAvatar, removeAvatar, uploading, error };
+}
+
 // Example usage in React component:
 /*
-import { usePersonaSubmit, personaAPI } from './frontend-api-client';
+import { usePersonaSubmit, useAvatar, api } from './frontend-api-client';
 
 function PersonaFormComponent() {
   const { submitPersona, loading, error } = usePersonaSubmit();
+  const { uploadAvatar, uploading } = useAvatar();
   
   const handleSubmit = async (formValues) => {
     try {
@@ -275,12 +373,50 @@ function PersonaFormComponent() {
     }
   };
 
+  const handleAvatarUpload = async (personaId, file) => {
+    try {
+      const result = await uploadAvatar(personaId, file);
+      console.log('Avatar uploaded:', result.avatar_url);
+      // Update UI with new avatar
+    } catch (error) {
+      console.error('Avatar upload failed:', error);
+    }
+  };
+
   return (
-    <PersonaForm 
-      onSubmit={handleSubmit}
-      loading={loading}
-      error={error}
-    />
+    <div>
+      <PersonaForm 
+        onSubmit={handleSubmit}
+        loading={loading}
+        error={error}
+      />
+      <input 
+        type="file" 
+        accept="image/*"
+        onChange={(e) => handleAvatarUpload(personaId, e.target.files[0])}
+        disabled={uploading}
+      />
+    </div>
+  );
+}
+
+// Avatar display component
+function AvatarDisplay({ personaId, avatarUrl }) {
+  return (
+    <div className="avatar-container">
+      {avatarUrl ? (
+        <img 
+          src={avatarUrl} 
+          alt="Persona Avatar" 
+          className="avatar-image"
+          style={{ width: 100, height: 100, borderRadius: '50%' }}
+        />
+      ) : (
+        <div className="avatar-placeholder">
+          No Avatar
+        </div>
+      )}
+    </div>
   );
 }
 */

@@ -364,7 +364,6 @@ router.post("/:id/avatar", upload.single("file"), async (req, res) => {
     };
 
     const { data: row, error: dbErr } = await req.supabase
-      .schema("private")
       .from("persona_avatars")
       .insert([meta])
       .select("*")
@@ -409,7 +408,6 @@ router.get("/:id/avatar", async (req, res) => {
         .json({ success: false, message: "Persona not found" });
 
     const { data: row, error } = await req.supabase
-      .schema("private")
       .from("persona_avatars")
       .select("*")
       .eq("persona_id", personaId)

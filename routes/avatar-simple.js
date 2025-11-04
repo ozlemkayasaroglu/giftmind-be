@@ -23,79 +23,94 @@ const upload = multer({
 });
 
 // POST /api/personas/:id/avatar-simple - Upload avatar as base64
-router.post("/:id/avatar-simple", upload.single("avatar"), async (req, res) => {
-  try {
-    console.log("🖼️ Avatar upload request:", {
-      personaId: req.params.id,
-      hasFile: !!req.file,
-      fileSize: req.file?.size,
-      fileType: req.file?.mimetype,
-      userId: req.user?.id,
+// Support both 'file' and 'avatar' field names
+router.post(
+  "/:id/avatar-simple",
+  (req, res, next) => {
+    // Try 'file' first, then 'avatar'
+    upload.single("file")(req, res, (err) => {
+      if (err && err.code === "LIMIT_UNEXPECTED_FIELD") {
+        // Try 'avatar' field instead
+        upload.single("avatar")(req, res, next);
+      } else {
+        next(err);
+      }
     });
+  },
+  async (req, res) => {
+    try {
+      console.log("🖼️ Avatar upload request:", {
+        personaId: req.params.id,
+        hasFile: !!req.file,
+        fileSize: req.file?.size,
+        fileType: req.file?.mimetype,
+        userId: req.user?.id,
+      });
 
-    const { id: personaId } = req.params;
+      const { id: personaId } = req.params;
 
-    if (!req.file) {
-      console.log("❌ No file in request");
-      return res.status(400).json({
+      if (!req.file) {
+        console.log("❌ No file in request");
+        return res.status(400).json({
+          success: false,
+          message: "No file uploaded",
+        });
+      }
+
+      // Verify persona ownership
+      const { data: persona, error: personaError } = await req.supabase
+        .from("personas")
+        .select("id")
+        .eq("id", personaId)
+        .eq("user_id", req.user.id)
+        .single();
+
+      if (personaError || !persona) {
+        return res.status(404).json({
+          success: false,
+          message: "Persona not found",
+        });
+      }
+
+      // Convert image to base64
+      const base64Image = `data:${
+        req.file.mimetype
+      };base64,${req.file.buffer.toString("base64")}`;
+
+      // Update persona with avatar_url
+      const { data, error } = await req.supabase
+        .from("personas")
+        .update({ avatar_url: base64Image })
+        .eq("id", personaId)
+        .eq("user_id", req.user.id)
+        .select("*")
+        .single();
+
+      if (error) {
+        console.error("Avatar update error:", error);
+        return res.status(400).json({
+          success: false,
+          message: error.message,
+        });
+      }
+
+      res.status(200).json({
+        success: true,
+        message: "Avatar uploaded successfully",
+        avatar_url: base64Image,
+        persona: data,
+      });
+    } catch (error) {
+      console.error("❌ Avatar upload error:", error);
+      console.error("Error stack:", error.stack);
+      res.status(500).json({
         success: false,
-        message: "No file uploaded",
+        message: "Internal server error: " + error.message,
+        error: process.env.NODE_ENV === "development" ? error.stack : undefined,
       });
     }
-
-    // Verify persona ownership
-    const { data: persona, error: personaError } = await req.supabase
-      .from("personas")
-      .select("id")
-      .eq("id", personaId)
-      .eq("user_id", req.user.id)
-      .single();
-
-    if (personaError || !persona) {
-      return res.status(404).json({
-        success: false,
-        message: "Persona not found",
-      });
-    }
-
-    // Convert image to base64
-    const base64Image = `data:${
-      req.file.mimetype
-    };base64,${req.file.buffer.toString("base64")}`;
-
-    // Update persona with avatar_url
-    const { data, error } = await req.supabase
-      .from("personas")
-      .update({ avatar_url: base64Image })
-      .eq("id", personaId)
-      .eq("user_id", req.user.id)
-      .select("*")
-      .single();
-
-    if (error) {
-      console.error("Avatar update error:", error);
-      return res.status(400).json({
-        success: false,
-        message: error.message,
-      });
-    }
-
-    res.status(200).json({
-      success: true,
-      message: "Avatar uploaded successfully",
-      avatar_url: base64Image,
-      persona: data,
-    });
-  } catch (error) {
-    console.error("❌ Avatar upload error:", error);
-    console.error("Error stack:", error.stack);
-    res.status(500).json({
-      success: false,
-      message: "Internal server error: " + error.message,
-      error: process.env.NODE_ENV === "development" ? error.stack : undefined,
-    });
   }
-});
+);
 
 // GET /api/personas/:id/avatar-simple - Get avatar
 router.get("/:id/avatar-simple", async (req, res) => {

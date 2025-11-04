@@ -7,10 +7,16 @@ const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 2 * 1024 * 1024 }, // 2MB limit
   fileFilter: (req, file, cb) => {
+    console.log("📁 File filter:", {
+      originalname: file.originalname,
+      mimetype: file.mimetype,
+    });
+
     // Only allow images
     if (file.mimetype.startsWith("image/")) {
       cb(null, true);
     } else {
+      console.log("❌ Invalid file type:", file.mimetype);
       cb(new Error("Only image files are allowed"), false);
     }
   },
@@ -19,9 +25,18 @@ const upload = multer({
 // POST /api/personas/:id/avatar-simple - Upload avatar as base64
 router.post("/:id/avatar-simple", upload.single("avatar"), async (req, res) => {
   try {
+    console.log("🖼️ Avatar upload request:", {
+      personaId: req.params.id,
+      hasFile: !!req.file,
+      fileSize: req.file?.size,
+      fileType: req.file?.mimetype,
+      userId: req.user?.id,
+    });
+
     const { id: personaId } = req.params;
 
     if (!req.file) {
+      console.log("❌ No file in request");
       return res.status(400).json({
         success: false,
         message: "No file uploaded",
@@ -72,10 +87,12 @@ router.post("/:id/avatar-simple", upload.single("avatar"), async (req, res) => {
       persona: data,
     });
   } catch (error) {
-    console.error("Avatar upload error:", error);
+    console.error("❌ Avatar upload error:", error);
+    console.error("Error stack:", error.stack);
     res.status(500).json({
       success: false,
-      message: "Internal server error",
+      message: "Internal server error: " + error.message,
+      error: process.env.NODE_ENV === "development" ? error.stack : undefined,
     });
   }
 });

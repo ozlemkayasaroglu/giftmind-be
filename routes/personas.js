@@ -73,8 +73,11 @@ router.get("/", async (req, res) => {
 // POST /api/personas - Create new persona (aligned with PersonaForm)
 router.post("/", async (req, res) => {
   try {
-    // Debug: Log incoming request body
-    console.log("📥 Incoming request body:", JSON.stringify(req.body, null, 2));
+    // 🐛 DEBUG: Log incoming request to check what frontend sends
+    console.log(
+      "📥 POST /api/personas - Request Body:",
+      JSON.stringify(req.body, null, 2)
+    );
 
     const {
       name,
@@ -83,7 +86,7 @@ router.post("/", async (req, res) => {
       interests,
       notes,
       description,
-      // Additional form fields
+      // Additional form fields (may not come from PersonaForm yet)
       role,
       ageMin,
       ageMax,
@@ -95,8 +98,8 @@ router.post("/", async (req, res) => {
       budgetMax,
     } = req.body || {};
 
-    // Debug: Log extracted values
-    console.log("🔍 Extracted values:", {
+    // 🐛 DEBUG: Log what we extracted
+    console.log("🔍 Extracted fields:", {
       name,
       birthDate,
       interests,
@@ -138,6 +141,12 @@ router.post("/", async (req, res) => {
       interests_raw: interestsInput || null,
       behavioral_insights: behavioralInsights || null,
     };
+
+    // 🐛 DEBUG: Log final personaData before DB insert
+    console.log(
+      "💾 Final personaData for DB:",
+      JSON.stringify(personaData, null, 2)
+    );
 
     // Budget: support budgetMin/budgetMax in addition to existing shapes
     const budgetParsed = parseBudgetFromBody({

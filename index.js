@@ -81,9 +81,11 @@ const verifyAuth = async (req, res, next) => {
 app.use("/api", authRoutes);
 app.use("/api/personas", verifyAuth, personasRoutes);
 app.use("/api/persona", verifyAuth, personaRoutes);
+// Events nested under personas (frontend expects /api/personas/{id}/events)
+app.use("/api/personas", verifyAuth, eventsRoutes);
 app.use("/api/gift", verifyAuth, giftRoutes);
 // app.use("/api", verifyAuth, milestonesRoutes); // Removed - file deleted
-app.use("/api/events", verifyAuth, eventsRoutes); // Re-enabled for frontend compatibility
+// app.use("/api/events", verifyAuth, eventsRoutes); // Moved to nested route under personas
 
 // Basic route for testing (must be before 404 handler)
 app.get("/", (req, res) => {

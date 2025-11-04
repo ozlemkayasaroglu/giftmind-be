@@ -3,8 +3,8 @@ const router = express.Router();
 
 // Temporary events routes - return empty responses until table migration
 
-// GET /api/events/:personaId - Get events for a persona
-router.get("/:personaId", async (req, res) => {
+// GET /api/personas/:personaId/events - Get events for a persona
+router.get("/:personaId/events", async (req, res) => {
   try {
     const { personaId } = req.params;
 
@@ -42,8 +42,8 @@ router.get("/:personaId", async (req, res) => {
   }
 });
 
-// POST /api/events/:personaId - Create new event (disabled)
-router.post("/:personaId", async (req, res) => {
+// POST /api/personas/:personaId/events - Create new event (disabled)
+router.post("/:personaId/events", async (req, res) => {
   try {
     const { personaId } = req.params;
 
@@ -80,16 +80,16 @@ router.post("/:personaId", async (req, res) => {
   }
 });
 
-// PUT /api/events/:eventId - Update event (disabled)
-router.put("/:eventId", async (req, res) => {
+// PUT /api/personas/events/:eventId - Update event (disabled)
+router.put("/events/:eventId", async (req, res) => {
   res.status(501).json({
     success: false,
     message: "Event update temporarily unavailable - table migration pending",
   });
 });
 
-// DELETE /api/events/:eventId - Delete event (disabled)
-router.delete("/:eventId", async (req, res) => {
+// DELETE /api/personas/events/:eventId - Delete event (disabled)
+router.delete("/events/:eventId", async (req, res) => {
   res.status(501).json({
     success: false,
     message: "Event deletion temporarily unavailable - table migration pending",

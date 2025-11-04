@@ -11,10 +11,9 @@ const authRoutes = require("./routes/auth");
 const personasRoutes = require("./routes/personas");
 const personaRoutes = require("./routes/persona");
 const giftRoutes = require("./routes/gift");
+const personalityTraitsRoutes = require("./routes/personality-traits");
 // const milestonesRoutes = require("./routes/milestones"); // Removed - file deleted
-const eventsRoutes = require("./routes/events-temp"); // Temporary events with empty responses
-const avatarSimpleRoutes = require("./routes/avatar-simple"); // Simple avatar system
-const avatarBasicRoutes = require("./routes/avatar-basic"); // Basic avatar system (no multer)
+// const eventsRoutes = require("./routes/events-temp"); // Removed - events system disabled
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -83,15 +82,11 @@ const verifyAuth = async (req, res, next) => {
 app.use("/api", authRoutes);
 app.use("/api/personas", verifyAuth, personasRoutes);
 app.use("/api/persona", verifyAuth, personaRoutes);
-// Events nested under personas (frontend expects /api/personas/{id}/events)
-app.use("/api/personas", verifyAuth, eventsRoutes);
-// Simple avatar system nested under personas
-app.use("/api/personas", verifyAuth, avatarSimpleRoutes);
-// Basic avatar system (no multer) nested under personas
-app.use("/api/personas", verifyAuth, avatarBasicRoutes);
+// Events system disabled - removed all event routes
 app.use("/api/gift", verifyAuth, giftRoutes);
+app.use("/api/personality-traits", personalityTraitsRoutes); // No auth required for traits
 // app.use("/api", verifyAuth, milestonesRoutes); // Removed - file deleted
-// app.use("/api/events", verifyAuth, eventsRoutes); // Moved to nested route under personas
+// Events system completely removed
 
 // Basic route for testing (must be before 404 handler)
 app.get("/", (req, res) => {

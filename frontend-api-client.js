@@ -182,93 +182,28 @@ export const api = {
     },
   },
 
-  events: {
-    async list(personaId) {
-      const result = await apiRequest(`/api/events/${personaId}`);
+  // Personality Traits API
+  personalityTraits: {
+    async getAll() {
+      const result = await apiRequest("/api/personality-traits/all");
       return {
         data: result.success ? result.data?.data : [],
         error: result.error,
       };
     },
 
-    async create(personaId, eventData) {
-      const result = await apiRequest(`/api/events/${personaId}`, {
-        method: "POST",
-        body: JSON.stringify(eventData),
-      });
+    async getByCategory() {
+      const result = await apiRequest("/api/personality-traits/categories");
+      return {
+        data: result.success ? result.data?.data : [],
+        error: result.error,
+      };
+    },
+
+    async getFull() {
+      const result = await apiRequest("/api/personality-traits");
       return {
         data: result.success ? result.data?.data : null,
-        error: result.error,
-      };
-    },
-
-    async update(eventId, eventData) {
-      const result = await apiRequest(`/api/events/${eventId}`, {
-        method: "PUT",
-        body: JSON.stringify(eventData),
-      });
-      return {
-        data: result.success ? result.data?.data : null,
-        error: result.error,
-      };
-    },
-
-    async delete(eventId) {
-      const result = await apiRequest(`/api/events/${eventId}`, {
-        method: "DELETE",
-      });
-      return {
-        data: result.success,
-        error: result.error,
-      };
-    },
-  },
-
-  // Avatar API
-  avatar: {
-    async upload(personaId, file) {
-      const formData = new FormData();
-      formData.append("avatar", file);
-
-      const token = getAuthToken();
-      const response = await fetch(
-        `${API_BASE_URL}/api/personas/${personaId}/avatar-simple`,
-        {
-          method: "POST",
-          headers: {
-            ...(token && { Authorization: `Bearer ${token}` }),
-          },
-          body: formData,
-        }
-      );
-
-      const data = await response.json();
-      return {
-        success: response.ok,
-        data: response.ok ? data : null,
-        error: response.ok ? null : data,
-      };
-    },
-
-    async get(personaId) {
-      const result = await apiRequest(
-        `/api/personas/${personaId}/avatar-simple`
-      );
-      return {
-        data: result.success ? result.data?.avatar_url : null,
-        error: result.error,
-      };
-    },
-
-    async remove(personaId) {
-      const result = await apiRequest(
-        `/api/personas/${personaId}/avatar-simple`,
-        {
-          method: "DELETE",
-        }
-      );
-      return {
-        data: result.success,
         error: result.error,
       };
     },
@@ -308,60 +243,12 @@ export function usePersonaSubmit() {
   return { submitPersona, loading, error };
 }
 
-// React hook for Avatar operations
-export function useAvatar() {
-  const [uploading, setUploading] = useState(false);
-  const [error, setError] = useState(null);
-
-  const uploadAvatar = async (personaId, file) => {
-    setUploading(true);
-    setError(null);
-
-    try {
-      const result = await api.avatar.upload(personaId, file);
-      if (result.success) {
-        return result.data;
-      } else {
-        throw new Error(result.error?.message || "Avatar upload failed");
-      }
-    } catch (err) {
-      setError(err.message);
-      throw err;
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  const getAvatar = async (personaId) => {
-    try {
-      const result = await api.avatar.get(personaId);
-      return result.data;
-    } catch (err) {
-      setError(err.message);
-      return null;
-    }
-  };
-
-  const removeAvatar = async (personaId) => {
-    try {
-      const result = await api.avatar.remove(personaId);
-      return result.data;
-    } catch (err) {
-      setError(err.message);
-      throw err;
-    }
-  };
-
-  return { uploadAvatar, getAvatar, removeAvatar, uploading, error };
-}
-
 // Example usage in React component:
 /*
-import { usePersonaSubmit, useAvatar, api } from './frontend-api-client';
+import { usePersonaSubmit, personaAPI } from './frontend-api-client';
 
 function PersonaFormComponent() {
   const { submitPersona, loading, error } = usePersonaSubmit();
-  const { uploadAvatar, uploading } = useAvatar();
   
   const handleSubmit = async (formValues) => {
     try {
@@ -373,50 +260,12 @@ function PersonaFormComponent() {
     }
   };
 
-  const handleAvatarUpload = async (personaId, file) => {
-    try {
-      const result = await uploadAvatar(personaId, file);
-      console.log('Avatar uploaded:', result.avatar_url);
-      // Update UI with new avatar
-    } catch (error) {
-      console.error('Avatar upload failed:', error);
-    }
-  };
-
   return (
-    <div>
-      <PersonaForm 
-        onSubmit={handleSubmit}
-        loading={loading}
-        error={error}
-      />
-      <input 
-        type="file" 
-        accept="image/*"
-        onChange={(e) => handleAvatarUpload(personaId, e.target.files[0])}
-        disabled={uploading}
-      />
-    </div>
-  );
-}
-
-// Avatar display component
-function AvatarDisplay({ personaId, avatarUrl }) {
-  return (
-    <div className="avatar-container">
-      {avatarUrl ? (
-        <img 
-          src={avatarUrl} 
-          alt="Persona Avatar" 
-          className="avatar-image"
-          style={{ width: 100, height: 100, borderRadius: '50%' }}
-        />
-      ) : (
-        <div className="avatar-placeholder">
-          No Avatar
-        </div>
-      )}
-    </div>
+    <PersonaForm 
+      onSubmit={handleSubmit}
+      loading={loading}
+      error={error}
+    />
   );
 }
 */

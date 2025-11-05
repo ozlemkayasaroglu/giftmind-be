@@ -303,6 +303,63 @@ router.get("/gift-categories", (req, res) => {
   }
 });
 
+// TEST ENDPOINT - Auth bypass için (sadece test amaçlı)
+router.post("/test-gift-ideas", async (req, res) => {
+  try {
+    // Test persona data
+    const testPersona = {
+      id: "test-id",
+      name: "Test Persona",
+      birth_date: "1990-05-15",
+      interests: ["teknoloji", "kahve", "kitap"],
+      personality_traits: ["analitik", "yaratıcı"],
+      role: "Yazılım Geliştirici",
+      goals: "Teknik becerilerini geliştirmek",
+      challenges: "İş-yaşam dengesi",
+      budget_min: 100,
+      budget_max: 500,
+      behavioral_insights: "Kaliteli ürünleri tercih eder",
+    };
+
+    console.log("🧪 Testing gift ideas generation...");
+
+    // Generate gift ideas using AI service
+    const giftRecommendations = await generateGiftIdeas(testPersona);
+
+    if (!giftRecommendations.success) {
+      return res.status(500).json({
+        success: false,
+        message: "Failed to generate gift ideas",
+        error: giftRecommendations.error,
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Test gift ideas generated successfully",
+      persona: {
+        id: testPersona.id,
+        name: testPersona.name,
+        age: giftRecommendations.age,
+        ageCategory: giftRecommendations.ageCategory,
+      },
+      giftIdeas: giftRecommendations.recommendations,
+      metadata: {
+        totalOptions: giftRecommendations.totalOptions,
+        generatedAt: giftRecommendations.generatedAt,
+        aiGenerated: giftRecommendations.aiGenerated,
+      },
+    });
+  } catch (error) {
+    console.error("Test gift ideas error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      error: error.message,
+    });
+  }
+});
+
 // POST /api/persona/:id/avatar — upload image (multipart/form-data, field name: file)
 router.post("/:id/avatar", upload.single("file"), async (req, res) => {
   try {

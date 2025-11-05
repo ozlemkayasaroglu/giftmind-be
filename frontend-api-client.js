@@ -17,14 +17,28 @@
 // - metadata (object)
 
 const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL ||
+  (typeof window !== "undefined" && window.VITE_API_BASE_URL) ||
+  process.env.VITE_API_BASE_URL ||
   "https://giftmind-be-production.up.railway.app";
 
 // Auth token helper
-const getAuthToken = () =>
-  localStorage.getItem("railway_token") ||
-  localStorage.getItem("authToken") ||
-  "";
+const getAuthToken = () => {
+  const token =
+    localStorage.getItem("railway_token") ||
+    localStorage.getItem("authToken") ||
+    localStorage.getItem("supabase.auth.token") ||
+    "";
+
+  // Debug: log token status (remove in production)
+  if (
+    typeof window !== "undefined" &&
+    window.location.hostname === "localhost"
+  ) {
+    console.log("🔑 Auth token status:", token ? "✅ Found" : "❌ Missing");
+  }
+
+  return token;
+};
 
 // Base fetch wrapper
 async function apiRequest(endpoint, options = {}) {
@@ -42,7 +56,32 @@ async function apiRequest(endpoint, options = {}) {
 
   try {
     const response = await fetch(url, config);
+
+    // Debug logging for development
+    if (
+      typeof window !== "undefined" &&
+      window.location.hostname === "localhost"
+    ) {
+      console.log(
+        `🌐 API Request: ${config.method || "GET"} ${endpoint} - Status: ${
+          response.status
+        }`
+      );
+    }
+
     const data = await response.json();
+
+    // Enhanced error handling for auth issues
+    if (response.status === 401) {
+      console.warn(
+        "🔒 Authentication failed - token may be invalid or expired"
+      );
+      // Optionally clear invalid tokens
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("railway_token");
+        localStorage.removeItem("authToken");
+      }
+    }
 
     return {
       success: response.ok,
@@ -51,6 +90,7 @@ async function apiRequest(endpoint, options = {}) {
       error: response.ok ? null : data,
     };
   } catch (error) {
+    console.error("🚨 API Request failed:", error);
     return {
       success: false,
       status: 0,
@@ -182,10 +222,18 @@ export const personaAPI = {
     });
   },
 
-  // Get gift recommendations
+  // Get gift recommendations - CORRECT ENDPOINT
   async getGiftRecommendations(personaId) {
     return apiRequest(`/api/persona/${personaId}/gift-ideas`, {
       method: "POST",
+    });
+  },
+
+  // Alternative gift recommendation endpoint
+  async getGiftRecommendationsV2(personaId) {
+    return apiRequest(`/api/gift/recommend`, {
+      method: "POST",
+      body: JSON.stringify({ personaId }),
     });
   },
 };
@@ -238,7 +286,18 @@ export const api = {
     async getRecommendations(personaId) {
       const result = await personaAPI.getGiftRecommendations(personaId);
       return {
-        data: result.success ? result.data?.giftIdeas : [],
+        data: result.success
+          ? result.data?.giftIdeas || result.data?.recommendations
+          : [],
+        error: result.error,
+      };
+    },
+
+    // Alternative method using gift service
+    async getRecommendationsV2(personaId) {
+      const result = await personaAPI.getGiftRecommendationsV2(personaId);
+      return {
+        data: result.success ? result.data?.recommendations : [],
         error: result.error,
       };
     },
@@ -304,68 +363,3 @@ export function usePersonaSubmit() {
 
   return { submitPersona, loading, error };
 }
-
-// Example usage in React component:
-/*
-import { usePersonaSubmit, personaAPI } from './frontend-api-client';
-
-function PersonaFormComponent() {
-  const { submitPersona, loading, error } = usePersonaSubmit();
-  
-  const handleSubmit = async (formValues) => {
-    try {
-      const persona = await submitPersona(formValues);
-      console.log('Persona created:', persona);
-      // Navigate to success page
-    } catch (error) {
-      console.error('Failed to create persona:', error);
-    }
-  };
-
-  return (
-    <PersonaForm 
-      onSubmit={handleSubmit}
-      loading={loading}
-      error={error}
-    />
-  );
-}
-
-// Example form data with all supported fields:
-const exampleFormData = {
-  // Required
-  name: "Ahmet Yılmaz",
-  
-  // Basic info
-  role: "Yazılım Geliştirici",
-  goals: "Teknik becerilerini geliştirmek ve takım lideri olmak",
-  challenges: "İş-yaşam dengesi kurmak ve stres yönetimi",
-  description: "Teknoloji tutkunu, kahve seven, kitap okuyan bir geliştirici",
-  
-  // Arrays
-  interests: ["teknoloji", "kahve", "kitap okuma", "bisiklet"],
-  personalityTraits: ["analitik", "perfeksiyonist", "teknoloji meraklısı"], // camelCase
-  // OR: personality_traits: ["analitik", "perfeksiyonist"], // snake_case
-  
-  // Budget (both formats supported)
-  budgetMin: 200, // camelCase
-  budgetMax: 1000, // camelCase
-  // OR: budget_min: 200, budget_max: 1000 // snake_case
-  
-  // Behavioral insights (both formats supported)
-  behavioralInsights: "Kaliteli ürünleri tercih eder, araştırma yapar", // camelCase
-  // OR: behavioral_insights: "Kaliteli ürünleri tercih eder" // snake_case
-  
-  // Personal details
-  notes: "Sabah kahve ritüeli çok önemli, yeni teknolojileri takip ediyor",
-  birthDate: "1985-12-20", // camelCase
-  // OR: birth_date: "1985-12-20" // snake_case
-  
-  // Metadata
-  metadata: {
-    source: "web_form",
-    version: "2.0",
-    tags: ["tech", "professional"]
-  }
-};
-*/

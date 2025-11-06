@@ -157,6 +157,8 @@ app.get("/", (req, res) => {
       register: "POST /api/register",
       login: "POST /api/login",
       logout: "POST /api/logout",
+      oauth: "POST /api/oauth",
+      oauthCallback: "POST /api/oauth/callback",
       user: "GET /api/user",
       personas: {
         list: "GET /api/personas",

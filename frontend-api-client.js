@@ -303,6 +303,31 @@ export const api = {
     },
   },
 
+  // OAuth API
+  oauth: {
+    async signInWithProvider(provider, redirectTo) {
+      const result = await apiRequest("/api/oauth", {
+        method: "POST",
+        body: JSON.stringify({ provider, redirectTo }),
+      });
+      return {
+        data: result.success ? result.data : null,
+        error: result.error,
+      };
+    },
+
+    async handleCallback(code, state) {
+      const result = await apiRequest("/api/oauth/callback", {
+        method: "POST",
+        body: JSON.stringify({ code, state }),
+      });
+      return {
+        data: result.success ? result.data : null,
+        error: result.error,
+      };
+    },
+  },
+
   // Personality Traits API
   personalityTraits: {
     async getAll() {

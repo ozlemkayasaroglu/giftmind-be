@@ -164,15 +164,26 @@ router.post("/oauth", async (req, res) => {
       });
     }
 
+    // Determine correct frontend URL based on environment
+    const getFrontendURL = () => {
+      if (process.env.NODE_ENV === "production") {
+        return (
+          process.env.PRODUCTION_FRONTEND_URL || "https://giftmind.netlify.app"
+        );
+      }
+      return process.env.FRONTEND_URL || "http://localhost:5173";
+    };
+
+    const frontendURL = getFrontendURL();
+    const callbackURL = redirectTo || `${frontendURL}/auth/callback`;
+
+    console.log(`🔗 OAuth redirect URL: ${callbackURL}`);
+
     // Generate Google OAuth URL with Supabase
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo:
-          redirectTo ||
-          `${
-            process.env.FRONTEND_URL || "http://localhost:5173"
-          }/auth/callback`,
+        redirectTo: callbackURL,
         scopes: "email profile",
       },
     });

@@ -95,10 +95,22 @@ app.post("/api/test-oauth", async (req, res) => {
       process.env.SUPABASE_ANON_KEY
     );
 
+    // Determine correct callback URL
+    const getFrontendURL = () => {
+      if (process.env.NODE_ENV === "production") {
+        return (
+          process.env.PRODUCTION_FRONTEND_URL || "https://giftmind.netlify.app"
+        );
+      }
+      return process.env.FRONTEND_URL || "http://localhost:5173";
+    };
+
+    const callbackURL = `${getFrontendURL()}/auth/callback`;
+
     const { data, error } = await testSupabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: "http://localhost:5173/auth/callback",
+        redirectTo: callbackURL,
         scopes: "email profile",
       },
     });

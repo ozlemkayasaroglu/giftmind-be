@@ -86,6 +86,44 @@ app.use("/api/persona", verifyAuth, personaRoutes);
 app.use("/api/gift", verifyAuth, giftRoutes);
 app.use("/api/personality-traits", personalityTraitsRoutes); // No auth required for traits
 
+// Test Google OAuth endpoint
+app.post("/api/test-oauth", async (req, res) => {
+  try {
+    const { createClient } = require("@supabase/supabase-js");
+    const testSupabase = createClient(
+      process.env.SUPABASE_URL,
+      process.env.SUPABASE_ANON_KEY
+    );
+
+    const { data, error } = await testSupabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: "http://localhost:5173/auth/callback",
+        scopes: "email profile",
+      },
+    });
+
+    if (error) {
+      return res.status(400).json({
+        success: false,
+        message: error.message,
+        error: error,
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Google OAuth URL generated",
+      url: data.url,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+});
+
 // Test endpoint without auth (temporary)
 app.post("/api/test-gift-ideas", async (req, res) => {
   try {

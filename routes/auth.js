@@ -156,34 +156,24 @@ router.post("/oauth", async (req, res) => {
   try {
     const { provider, redirectTo } = req.body;
 
-    // Validate provider
-    const supportedProviders = [
-      "google",
-      "github",
-      "discord",
-      "facebook",
-      "twitter",
-    ];
-    if (!provider || !supportedProviders.includes(provider.toLowerCase())) {
+    // Only support Google OAuth
+    if (!provider || provider.toLowerCase() !== "google") {
       return res.status(400).json({
         success: false,
-        message: `Provider must be one of: ${supportedProviders.join(", ")}`,
+        message: "Only Google OAuth is supported",
       });
     }
 
-    // Generate OAuth URL with Supabase
+    // Generate Google OAuth URL with Supabase
     const { data, error } = await supabase.auth.signInWithOAuth({
-      provider: provider.toLowerCase(),
+      provider: "google",
       options: {
         redirectTo:
           redirectTo ||
           `${
-            process.env.FRONTEND_URL || "http://localhost:3000"
+            process.env.FRONTEND_URL || "http://localhost:5173"
           }/auth/callback`,
-        queryParams: {
-          access_type: "offline",
-          prompt: "consent",
-        },
+        scopes: "email profile",
       },
     });
 

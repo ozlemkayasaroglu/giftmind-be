@@ -303,12 +303,15 @@ export const api = {
     },
   },
 
-  // OAuth API
+  // Google OAuth API
   oauth: {
-    async signInWithProvider(provider, redirectTo) {
+    async signInWithGoogle(redirectTo) {
       const result = await apiRequest("/api/oauth", {
         method: "POST",
-        body: JSON.stringify({ provider, redirectTo }),
+        body: JSON.stringify({
+          provider: "google",
+          redirectTo: redirectTo || `${window.location.origin}/auth/callback`,
+        }),
       });
       return {
         data: result.success ? result.data : null,

@@ -274,10 +274,12 @@ async function generateGiftIdeas(persona) {
     // Prefer Gemini if API key is available
     if (genAI) {
       try {
-        // Try to use the specified model, fallback to gemini-pro if it fails
-        const modelName = GEMINI_MODEL.startsWith("models/")
-          ? GEMINI_MODEL
-          : `models/${GEMINI_MODEL}`;
+        // Remove -latest suffix if present (not supported in v1beta API)
+        let modelName = GEMINI_MODEL.replace("-latest", "");
+        // Add models/ prefix if not present
+        modelName = modelName.startsWith("models/")
+          ? modelName
+          : `models/${modelName}`;
         console.log("🤖 Using Gemini model:", modelName);
         const model = genAI.getGenerativeModel({ model: modelName });
         const prompt = createGiftPrompt(persona);

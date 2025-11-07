@@ -51,6 +51,31 @@ router.post("/recommend", async (req, res) => {
         .json({ success: false, message: "Persona not found" });
     }
 
+    // Debug: Log persona data to identify missing name issue
+    console.log("🎁 Generating gift ideas for persona:", personaId);
+    console.log("📋 Persona data:", {
+      id: persona.id,
+      name: persona.name,
+      hasName: !!persona.name,
+      keys: Object.keys(persona),
+      fullPersona: persona,
+    });
+
+    // Validate persona name
+    if (!persona.name) {
+      console.error("❌ Persona name is missing:", persona);
+      return res.status(400).json({
+        success: false,
+        message: "Persona name is required for gift recommendations",
+        debug: {
+          personaId,
+          personaKeys: Object.keys(persona),
+          hasName: !!persona.name,
+          persona: persona,
+        },
+      });
+    }
+
     const giftRecommendations = await generateGiftIdeas(persona);
 
     if (!giftRecommendations.success) {
@@ -62,40 +87,47 @@ router.post("/recommend", async (req, res) => {
       });
     }
 
-    // Save recommendations to database
+    // Save recommendations to database (optional - don't fail if this fails)
     const savedRecommendations = [];
-    for (const rec of giftRecommendations.recommendations || []) {
-      const title =
-        typeof rec === "string" ? rec : rec?.title || rec?.name || "";
-      const reason = typeof rec === "object" ? rec?.reason : null;
-      const confidence = typeof rec === "object" ? rec?.confidence : 80;
+    try {
+      for (const rec of giftRecommendations.recommendations || []) {
+        const title =
+          typeof rec === "string" ? rec : rec?.title || rec?.name || "";
+        const reason = typeof rec === "object" ? rec?.reason : null;
+        const confidence = typeof rec === "object" ? rec?.confidence : 80;
 
-      if (title) {
-        const { data: savedRec, error: saveError } = await req.supabase
-          .from("gift_recommendations")
-          .insert([
-            {
-              user_id: req.user.id,
-              persona_id: personaId,
-              title: title,
-              reason: reason,
-              confidence: confidence,
-              ai_generated: giftRecommendations.aiGenerated || false,
-              model_used: "gemini-2.5-flash",
-              metadata: {
-                age: giftRecommendations.age,
-                ageCategory: giftRecommendations.ageCategory,
-                generatedAt: giftRecommendations.generatedAt,
+        if (title) {
+          const { data: savedRec, error: saveError } = await req.supabase
+            .from("gift_recommendations")
+            .insert([
+              {
+                user_id: req.user.id,
+                persona_id: personaId,
+                title: title,
+                reason: reason,
+                confidence: confidence,
+                ai_generated: giftRecommendations.aiGenerated || false,
+                model_used: "gemini-2.5-flash",
+                metadata: {
+                  age: giftRecommendations.age,
+                  ageCategory: giftRecommendations.ageCategory,
+                  generatedAt: giftRecommendations.generatedAt,
+                },
               },
-            },
-          ])
-          .select("*")
-          .single();
+            ])
+            .select("*")
+            .single();
 
-        if (!saveError && savedRec) {
-          savedRecommendations.push(savedRec);
+          if (!saveError && savedRec) {
+            savedRecommendations.push(savedRec);
+          } else if (saveError) {
+            console.warn("Failed to save recommendation:", saveError.message);
+          }
         }
       }
+    } catch (saveErr) {
+      console.error("Error saving recommendations to DB:", saveErr);
+      // Continue anyway - we still have the recommendations
     }
 
     const suggestionTitles = (giftRecommendations.recommendations || [])

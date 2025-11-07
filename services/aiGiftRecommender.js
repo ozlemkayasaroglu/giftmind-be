@@ -7,7 +7,7 @@ const { GoogleGenerativeAI } = require("@google/generative-ai");
 
 // Initialize Gemini client (set GEMINI_API_KEY in environment)
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
-const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-pro";
+const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-1.5-flash";
 let genAI = null;
 if (GEMINI_API_KEY) {
   try {
@@ -273,22 +273,41 @@ async function generateGiftIdeas(persona) {
     // Prefer Gemini if API key is available
     if (genAI) {
       try {
+        console.log("🤖 Using Gemini model:", GEMINI_MODEL);
         const model = genAI.getGenerativeModel({ model: GEMINI_MODEL });
         const prompt = createGiftPrompt(persona);
+        console.log("📝 Prompt length:", prompt.length, "characters");
+
         const resp = await model.generateContent(prompt);
+        console.log("✅ Gemini response received");
+
         const text = resp?.response?.text
           ? resp.response.text()
           : (await resp.text?.()) || "";
+
+        console.log("📄 Response text length:", text.length, "characters");
+        console.log("📄 Response preview:", text.substring(0, 200));
+
         if (text && typeof text === "string") {
           const parsed = parseAIResponse(text, persona);
+          console.log("🎁 Parsed recommendations:", parsed.length, "items");
+
           if (parsed && parsed.length >= 1) {
             recommendations = parsed;
             usedAI = true;
+            console.log("✅ Using AI-generated recommendations");
+          } else {
+            console.warn("⚠️ Parsing returned no recommendations");
           }
+        } else {
+          console.warn("⚠️ No text in Gemini response");
         }
       } catch (e) {
-        console.warn("Gemini error, falling back:", e?.message || e);
+        console.error("❌ Gemini error, falling back:", e?.message || e);
+        console.error("Error details:", e);
       }
+    } else {
+      console.warn("⚠️ Gemini not initialized (no API key)");
     }
 
     if (!recommendations.length) {

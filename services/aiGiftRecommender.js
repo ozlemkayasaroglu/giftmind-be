@@ -71,7 +71,7 @@ function createGiftPrompt(persona) {
   const age = calculateAge(birth_date);
   const ageCategory = getAgeCategory(age);
 
-  let prompt = `Sen bir hediye uzmanısın. Aşağıdaki kişi için 3 adet çok kişisel ve düşünceli hediye önerisi hazırla.\n\n`;
+  let prompt = `Sen bir hediye uzmanısın. Aşağıdaki kişi için 4 adet çok kişisel ve düşünceli hediye önerisi hazırla.\n\n`;
 
   prompt += `🎯 KİŞİ PROFİLİ:\n`;
   prompt += `İsim: ${name}\n`;
@@ -191,6 +191,7 @@ function createGiftPrompt(persona) {
   prompt += `1. [Hediye Adı] - [Bu hediyenin neden bu kişiye mükemmel uyduğunun detaylı açıklaması]\n`;
   prompt += `2. [Hediye Adı] - [Bu hediyenin neden bu kişiye mükemmel uyduğunun detaylı açıklaması]\n`;
   prompt += `3. [Hediye Adı] - [Bu hediyenin neden bu kişiye mükemmel uyduğunun detaylı açıklaması]\n`;
+  prompt += `4. [Hediye Adı] - [Bu hediyenin neden bu kişiye mükemmel uyduğunun detaylı açıklaması]\n`;
 
   return prompt;
 }
@@ -202,7 +203,7 @@ function parseAIResponse(response, persona) {
   const lines = response.split("\n").filter((line) => line.trim());
   const recommendations = [];
 
-  for (let i = 0; i < lines.length && recommendations.length < 3; i++) {
+  for (let i = 0; i < lines.length && recommendations.length < 4; i++) {
     const line = lines[i].trim();
 
     // Look for numbered lists (1., 2., 3.) or bullet points
@@ -244,7 +245,7 @@ function generateFallbackGifts(persona) {
     "Özel tasarım kupa",
   ];
 
-  return fallbackGifts.slice(0, 3).map((gift, index) => ({
+  return fallbackGifts.slice(0, 4).map((gift, index) => ({
     id: index + 1,
     title: gift,
     reason: `${persona.name} için özenle seçilmiş hediye`,
@@ -291,9 +292,9 @@ async function generateGiftIdeas(persona) {
       recommendations = generateFallbackGifts(persona);
     }
 
-    while (recommendations.length < 3) {
+    while (recommendations.length < 4) {
       const extra = generateFallbackGifts(persona);
-      recommendations.push(...extra.slice(0, 3 - recommendations.length));
+      recommendations.push(...extra.slice(0, 4 - recommendations.length));
     }
 
     return {
@@ -301,7 +302,7 @@ async function generateGiftIdeas(persona) {
       personaName: name,
       age,
       ageCategory,
-      recommendations: recommendations.slice(0, 3),
+      recommendations: recommendations.slice(0, 4),
       generatedAt: new Date().toISOString(),
       aiGenerated: usedAI,
       totalOptions: recommendations.length,

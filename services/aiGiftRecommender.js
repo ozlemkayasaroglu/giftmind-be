@@ -7,8 +7,7 @@ const { GoogleGenerativeAI } = require("@google/generative-ai");
 
 // Initialize Gemini client (set GEMINI_API_KEY in environment)
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
-// Use gemini-pro as default (compatible with v1beta API used by current SDK version)
-// Note: gemini-1.5-flash requires v1 API which needs SDK update
+// Use gemini-pro (free, 60 requests/minute)
 const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-pro";
 let genAI = null;
 if (GEMINI_API_KEY) {
@@ -272,17 +271,12 @@ async function generateGiftIdeas(persona) {
     let recommendations = [];
     let usedAI = false;
 
-    // Prefer Gemini if API key is available
+    // Use Gemini if API key is available
     if (genAI) {
       try {
-        // Remove -latest suffix if present (not supported in v1beta API)
-        let modelName = GEMINI_MODEL.replace("-latest", "");
-        // Add models/ prefix if not present
-        modelName = modelName.startsWith("models/")
-          ? modelName
-          : `models/${modelName}`;
-        console.log("🤖 Using Gemini model:", modelName);
-        const model = genAI.getGenerativeModel({ model: modelName });
+        // Use model name directly (SDK handles the rest)
+        console.log("🤖 Using Gemini model:", GEMINI_MODEL);
+        const model = genAI.getGenerativeModel({ model: GEMINI_MODEL });
         const prompt = createGiftPrompt(persona);
         console.log("📝 Prompt length:", prompt.length, "characters");
 

@@ -7,7 +7,8 @@ const { GoogleGenerativeAI } = require("@google/generative-ai");
 
 // Initialize Gemini client (set GEMINI_API_KEY in environment)
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
-const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-1.5-flash-latest";
+// Use gemini-pro as default (stable model that works with v1beta API)
+const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-pro";
 let genAI = null;
 if (GEMINI_API_KEY) {
   try {

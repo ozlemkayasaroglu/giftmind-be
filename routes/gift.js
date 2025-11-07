@@ -108,6 +108,7 @@ router.post("/recommend", async (req, res) => {
 
         if (title) {
           const { data: savedRec, error: saveError } = await req.supabase
+            .schema("public")
             .from("gift_recommendations")
             .insert([
               {
@@ -300,6 +301,7 @@ router.get("/recommendations/:personaId", async (req, res) => {
     }
 
     const { data: recommendations, error } = await req.supabase
+      .schema("public")
       .from("gift_recommendations")
       .select("*")
       .eq("persona_id", personaId)

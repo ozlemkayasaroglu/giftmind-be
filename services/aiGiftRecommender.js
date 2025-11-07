@@ -258,8 +258,11 @@ function generateFallbackGifts(persona) {
  */
 async function generateGiftIdeas(persona) {
   try {
-    const { name } = persona;
-    if (!name) throw new Error("Persona name is required");
+    // Use name, role, or a default identifier
+    const name = persona.name || persona.role || "Kişi";
+    if (!name || name.trim() === "") {
+      throw new Error("Persona name or role is required");
+    }
 
     const age = calculateAge(persona.birth_date);
     const ageCategory = getAgeCategory(age);

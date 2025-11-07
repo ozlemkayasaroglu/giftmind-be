@@ -61,19 +61,29 @@ router.post("/recommend", async (req, res) => {
       fullPersona: persona,
     });
 
-    // Validate persona name
-    if (!persona.name) {
-      console.error("❌ Persona name is missing:", persona);
+    // Validate persona has some identifier (name or role)
+    if (!persona.name && !persona.role) {
+      console.error("❌ Persona name and role are both missing:", persona);
       return res.status(400).json({
         success: false,
-        message: "Persona name is required for gift recommendations",
+        message:
+          "Persona must have either a name or role for gift recommendations",
         debug: {
           personaId,
           personaKeys: Object.keys(persona),
           hasName: !!persona.name,
-          persona: persona,
+          hasRole: !!persona.role,
         },
       });
+    }
+
+    // Use name or role as fallback
+    if (!persona.name || persona.name.trim() === "") {
+      console.warn(
+        "⚠️ Persona name is empty, using role as fallback:",
+        persona.role
+      );
+      persona.name = persona.role || "Kişi";
     }
 
     const giftRecommendations = await generateGiftIdeas(persona);
